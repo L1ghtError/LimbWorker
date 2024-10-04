@@ -69,10 +69,10 @@ liret setRoutes(AMQP::Connection &conn, AMQP::Channel &ch) {
         limb::MUpscaleImage pbody;
         pbody.berawtoh(body);
 
-        printf("Got connectoin %s\n", message.correlationID());
+        printf("Got connectoin %s\n", message.correlationID().c_str());
         // Progress response
         int iteration = 0;
-        std::chrono::time_point<std::chrono::steady_clock> firstEnt;
+        std::chrono::high_resolution_clock::time_point firstEnt;
         auto progressCb = [&message, &iteration, &firstEnt, &ch, deliveryTag](float progress) {
           if (iteration == 0) {
             firstEnt = std::chrono::high_resolution_clock::now();
