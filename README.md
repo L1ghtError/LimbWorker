@@ -1,0 +1,1 @@
+Cpp app with AMQP rabbitmq connection that blures picture :)

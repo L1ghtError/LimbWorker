@@ -1,0 +1,7 @@
+[submodule "Dependencies/ncnn"]
+	path = Dependencies/ncnn
+	url = https://github.com/Tencent/ncnn.git
+	branch = master
+[submodule "Dependencies/AMQP-CPP"]
+	path = Dependencies/AMQP-CPP
+	url = https://github.com/CopernicaMarketingSoftware/AMQP-CPP.git
