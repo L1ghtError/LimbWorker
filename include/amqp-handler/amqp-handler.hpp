@@ -2,13 +2,17 @@
 #define _AMQP_HANDLER_HPP_
 #include <amqpcpp.h>
 
+struct AmqpConfig {
+  uint16_t heartbeat;
+};
+
 struct AmqpHandlerImpl;
 class AmqpHandler : public AMQP::ConnectionHandler {
 public:
   static constexpr size_t BUFFER_SIZE = 8 * 1024 * 1024;  // 8Mb
   static constexpr size_t TEMP_BUFFER_SIZE = 1024 * 1024; // 1Mb
 
-  AmqpHandler(const char *host, uint16_t port);
+  AmqpHandler(const char *host, uint16_t port, const AmqpConfig *conf = nullptr);
   virtual ~AmqpHandler();
 
   void loop();
@@ -22,6 +26,16 @@ private:
 
   void close();
   void sendDataFromBuffer();
+  void heartbeater(AMQP::Connection *connection, uint16_t interv);
+  /**
+   *  Method that is called when the server tries to negotiate a heartbeat
+   *  interval, and that is overridden to get rid of the default implementation
+   *  (which vetoes the suggested heartbeat interval), and accept the interval
+   *  instead.
+   *  @param  connection      The connection on which the error occurred
+   *  @param  interval        The suggested interval in seconds
+   */
+  uint16_t onNegotiate(AMQP::Connection *connection, uint16_t interval) override;
   /**
    *  Method that is called by the AMQP library every time it has data
    *  available that should be sent to RabbitMQ.
@@ -38,7 +52,7 @@ private:
    *  to use.
    *  @param  connection      The connection that can now be used
    */
-   void onReady(AMQP::Connection *connection) override;
+  void onReady(AMQP::Connection *connection) override;
 
   /**
    *  Method that is called by the AMQP library when a fatal error occurs

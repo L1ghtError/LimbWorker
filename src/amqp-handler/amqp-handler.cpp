@@ -1,5 +1,11 @@
 #include "amqp-handler/amqp-handler.hpp"
 
+#include <atomic>
+#include <chrono>
+#include <future>
+#include <mutex>
+#include <thread>
+
 #if (defined(_WIN16) || defined(_WIN32) || defined(_WIN64) || defined(__WINDOWS__)) && !defined(__CYGWIN__)
 #define _CRT_SECURE_NO_WARNINGS
 #include <winsock2.h>
@@ -7,8 +13,8 @@
 #pragma comment(lib, "ws2_32.lib")
 #endif
 
-#define CONNECTION_TIMEOUT 5000 // 5 seconds
-
+#define CONNECTION_TIMEOUT 5000   // 5 seconds
+#define HEARTBEAT_RESOLUTION 1000 // 1 second
 class Buffer {
 public:
   Buffer(size_t size) : m_data(size, 0), m_use(0) {}
@@ -44,9 +50,9 @@ private:
 };
 
 struct AmqpHandlerImpl {
-  AmqpHandlerImpl()
+  AmqpHandlerImpl(const AmqpConfig *_conf = nullptr)
       : connected(false), connection(nullptr), quit(false), keepAlive(true), inputBuffer(AmqpHandler::BUFFER_SIZE),
-        outBuffer(AmqpHandler::BUFFER_SIZE), tmpBuff(AmqpHandler::TEMP_BUFFER_SIZE), sock(INVALID_SOCKET) {
+        outBuffer(AmqpHandler::BUFFER_SIZE), tmpBuff(AmqpHandler::TEMP_BUFFER_SIZE), sock(INVALID_SOCKET), conf(_conf) {
     timeout.tv_sec = 0;
     timeout.tv_usec = 10000;
   }
@@ -61,11 +67,20 @@ struct AmqpHandlerImpl {
   SOCKET sock;
   AMQP::Connection *connection;
   std::vector<char> tmpBuff;
-  bool quit;
   bool connected;
+  const AmqpConfig *conf;
+
+  std::atomic<bool> quit;
+  std::atomic<std::chrono::high_resolution_clock::time_point> lastMessage;
+  // for socket send
+  std::mutex sendMtx;
+  // for buffer write
+  std::mutex writeMtx;
+  // for cleaunp
+  std::vector<std::future<void>> heartbeaters;
 };
 
-AmqpHandler::AmqpHandler(const char *host, uint16_t port) : m_impl(new AmqpHandlerImpl) {
+AmqpHandler::AmqpHandler(const char *host, uint16_t port, const AmqpConfig *conf) : m_impl(new AmqpHandlerImpl(conf)) {
   const int timeout = CONNECTION_TIMEOUT;
   do {
     int err = WSAStartup(MAKEWORD(2, 2), &m_impl->wsaData);
@@ -153,7 +168,7 @@ void AmqpHandler::loop() {
           m_impl->inputBuffer.shl(count);
         }
       }
-      //sendDataFromBuffer();
+      // sendDataFromBuffer();
     }
   }
   if (m_impl->quit == 0) {
@@ -166,9 +181,11 @@ void AmqpHandler::loop() {
 
 AmqpHandler::~AmqpHandler() {
   close();
+  for (int i = 0; i < m_impl->heartbeaters.size(); i++) {
+    m_impl->heartbeaters[i].wait();
+  }
   delete m_impl;
 }
-
 void AmqpHandler::quit() { m_impl->quit = true; }
 
 void AmqpHandler::AmqpHandler::close() {
@@ -176,8 +193,45 @@ void AmqpHandler::AmqpHandler::close() {
   closesocket(m_impl->sock);
   WSACleanup();
 }
+// Should run async
+void AmqpHandler::heartbeater(AMQP::Connection *connection, uint16_t interval) {
+  std::chrono::high_resolution_clock::time_point lastSent = std::chrono::high_resolution_clock::now();
+  while (m_impl->quit == false) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(HEARTBEAT_RESOLUTION));
+    if (connection == nullptr) {
+      return;
+    }
+    auto currentTime = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<float> diff = currentTime - lastSent;
+    // if time is up, then try to send heartbeat
+    if (uint16_t(diff.count()) >= interval) {
+      auto const lasMessage = m_impl->lastMessage.load();
+      std::chrono::duration<float> writeDiff = currentTime - lasMessage;
+
+      // If less than <interval> seconds have passed since the last message, then we skip
+      if (uint16_t(writeDiff.count()) < interval) {
+        lastSent = lasMessage;
+      } else {
+        lastSent = currentTime;
+        connection->heartbeat();
+      }
+    }
+  }
+}
+
+uint16_t AmqpHandler::onNegotiate(AMQP::Connection *connection, uint16_t interval) {
+
+  if (m_impl->conf->heartbeat == 0) {
+    return 0;
+  }
+  interval = interval < m_impl->conf->heartbeat ? interval : m_impl->conf->heartbeat;
+  interval = interval < 10 ? 10 : interval;
+  m_impl->heartbeaters.emplace_back(std::async(&AmqpHandler::heartbeater, this, connection, interval));
+  return interval;
+}
 
 void AmqpHandler::onData(AMQP::Connection *connection, const char *data, size_t size) {
+  std::lock_guard<std::mutex> guard(m_impl->writeMtx);
   m_impl->connection = connection;
   const size_t writen = m_impl->outBuffer.write(data, size);
   if (writen == size) {
@@ -198,7 +252,12 @@ void AmqpHandler::onClosed(AMQP::Connection *connection) {
 bool AmqpHandler::connected() const { return m_impl->connected; }
 
 void AmqpHandler::sendDataFromBuffer() {
+  std::lock_guard<std::mutex> guard(m_impl->sendMtx);
   if (m_impl->outBuffer.available()) {
+    // mesure time for heartbeat, in this case its not nessesary to be atomic
+    // but read can be in critial sections
+    m_impl->lastMessage.store(std::chrono::high_resolution_clock::now());
+
     send(m_impl->sock, m_impl->outBuffer.data(), (int)m_impl->outBuffer.available(), 0);
     m_impl->outBuffer.drain();
   }

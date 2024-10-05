@@ -23,4 +23,4 @@ private:
   ncnn::Layer *bicubic_4x;
 };
 } // namespace limb
-#endif _REALESRGAN_SERVICE_H_
+#endif // _REALESRGAN_SERVICE_H_
