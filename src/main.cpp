@@ -150,7 +150,9 @@ int main(int argc, char **argv) {
   limb::imageService->addOption(opts);
 
   // Rabbitmq
-  AmqpHandler handler("192.168.1.103", 5672);
+  AmqpConfig amqpConf;
+  amqpConf.heartbeat = 60;
+  AmqpHandler handler("192.168.1.103", 5672, &amqpConf);
   AMQP::Connection connection(&handler, AMQP::Login("test", "test"), "/");
   AMQP::Channel ch(&connection);
   liret ret = setRoutes(connection, ch);

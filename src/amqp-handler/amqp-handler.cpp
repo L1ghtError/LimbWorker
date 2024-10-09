@@ -53,6 +53,11 @@ struct AmqpHandlerImpl {
   AmqpHandlerImpl(const AmqpConfig *_conf = nullptr)
       : connected(false), connection(nullptr), quit(false), keepAlive(true), inputBuffer(AmqpHandler::BUFFER_SIZE),
         outBuffer(AmqpHandler::BUFFER_SIZE), tmpBuff(AmqpHandler::TEMP_BUFFER_SIZE), sock(INVALID_SOCKET), conf(_conf) {
+
+    if (conf == nullptr) {
+      static const AmqpConfig defaultConf = {60};
+      conf = &defaultConf;
+    }
     timeout.tv_sec = 0;
     timeout.tv_usec = 10000;
   }

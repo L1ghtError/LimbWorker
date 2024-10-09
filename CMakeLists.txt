@@ -80,22 +80,18 @@ set(ABSOLUTE_AMQP_CPP_ROOTDIR "${CMAKE_CURRENT_SOURCE_DIR}/${AMQP_CPP_ROOTDIR}")
 include_directories("include")
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 
-include_directories(${CMAKE_SOURCE_DIR}/Dependencies/ffmpeg-win64/include)
 include_directories("Dependencies/AMQP-CPP/include")
 
 include_directories("Dependencies/mongo/${BUILD_ROUTE}/include/libbson-1.0")
 include_directories("Dependencies/mongo/${BUILD_ROUTE}/include/libmongoc-1.0")
 
 #libs
-link_directories(${CMAKE_SOURCE_DIR}/Dependencies/ffmpeg-win64/lib)
 link_directories("Dependencies/AMQP-CPP/build-debug/bin/")
 link_directories("Dependencies/AMQP-CPP/build-release/bin/")
 
 link_directories("Dependencies/mongo/${BUILD_ROUTE}/lib")
 
 #dlls
-set(FFMPEG_DLL_SOURCE_DIR ${CMAKE_SOURCE_DIR}/Dependencies/ffmpeg-win64/lib)
-file(GLOB DLL_FILES_FFMPEG "${FFMPEG_DLL_SOURCE_DIR}/*.dll")
 
 set(MONGO_DLL_SOURCE_DIR ${CMAKE_SOURCE_DIR}/Dependencies/mongo/${BUILD_ROUTE}/bin)
 file(GLOB DLL_FILES_MONGO "${MONGO_DLL_SOURCE_DIR}/*.dll" )
@@ -251,11 +247,10 @@ add_dependencies(LimbMediaService generate-spirv)
 # Link libraries
 target_link_libraries(LimbMediaService PRIVATE ncnn amqpcpp
     "mongoc-1.0" "bson-1.0"
-    "avformat" "avutil" "avdevice" "avcodec" "swscale" 
 )
 
 # copy dlls to out directory
-list(APPEND DLL_FILES ${DLL_FILES_FFMPEG} ${COPY_FILES_MONGO})
+list(APPEND DLL_FILES ${COPY_FILES_MONGO})
 
 add_custom_command(TARGET LimbMediaService POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
