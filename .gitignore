@@ -36,6 +36,10 @@ __pycache__
 *.out
 *.app
 
+# Ncnn models
+*.bin
+*.param
+
 # Directories
 build
 .vs
