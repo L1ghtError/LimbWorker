@@ -7,10 +7,25 @@
 #include <thread>
 
 #if (defined(_WIN16) || defined(_WIN32) || defined(_WIN64) || defined(__WINDOWS__)) && !defined(__CYGWIN__)
+#define WIN_NET
 #define _CRT_SECURE_NO_WARNINGS
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #pragma comment(lib, "ws2_32.lib")
+#else
+#include <arpa/inet.h>
+#include <fcntl.h>
+#include <netinet/in.h>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <unistd.h>
+#define SOCKET int
+#define INVALID_SOCKET (SOCKET)(~0)
+#define SOCKET_ERROR (-1)
+#define closesocket close
+#define ioctlsocket fcntl
+#define SOCKADDR sockaddr
 #endif
 
 #define CONNECTION_TIMEOUT 5000   // 5 seconds
@@ -49,6 +64,13 @@ private:
   size_t m_use;
 };
 
+int getNetErr() {
+#ifdef WIN_NET
+  return WSAGetLastError();
+#endif
+  return errno;
+}
+
 struct AmqpHandlerImpl {
   AmqpHandlerImpl(const AmqpConfig *_conf = nullptr)
       : connected(false), connection(nullptr), quit(false), keepAlive(true), inputBuffer(AmqpHandler::BUFFER_SIZE),
@@ -62,8 +84,12 @@ struct AmqpHandlerImpl {
     timeout.tv_usec = 10000;
   }
 
-  BOOL keepAlive = TRUE;
+#ifdef WIN_NET
+  bool keepAlive = true;
   WSADATA wsaData;
+#else
+  int keepAlive = true;
+#endif
   fd_set readfds, writefds;
   struct timeval timeout;
 
@@ -86,12 +112,20 @@ struct AmqpHandlerImpl {
 };
 
 AmqpHandler::AmqpHandler(const char *host, uint16_t port, const AmqpConfig *conf) : m_impl(new AmqpHandlerImpl(conf)) {
-  const int timeout = CONNECTION_TIMEOUT;
   do {
-    int err = WSAStartup(MAKEWORD(2, 2), &m_impl->wsaData);
+    int err = 0;
+
+#ifdef WIN_NET
+    const int timeout = CONNECTION_TIMEOUT;
+    err = WSAStartup(MAKEWORD(2, 2), &m_impl->wsaData);
     if (err != 0) {
       break;
     }
+#else
+    timeval timeout;
+    timeout.tv_usec = 0;
+    timeout.tv_sec = CONNECTION_TIMEOUT / 1000;
+#endif
     // Sock creation
     sockaddr_in service;
     service.sin_family = AF_INET;
@@ -107,6 +141,7 @@ AmqpHandler::AmqpHandler(const char *host, uint16_t port, const AmqpConfig *conf
 
     // Set receive timeout (SO_RCVTIMEO) to 5 seconds
     if (setsockopt(m_impl->sock, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout, sizeof(timeout)) < 0) {
+      auto res = getNetErr();
       break;
     }
 
@@ -117,12 +152,13 @@ AmqpHandler::AmqpHandler(const char *host, uint16_t port, const AmqpConfig *conf
 
     err = setsockopt(m_impl->sock, SOL_SOCKET, SO_KEEPALIVE, (char *)&m_impl->keepAlive, sizeof(m_impl->keepAlive));
     if (err == SOCKET_ERROR) {
+      auto res = getNetErr();
       break;
     }
 
     err = connect(m_impl->sock, (SOCKADDR *)&service, sizeof(service));
     if (err == SOCKET_ERROR) {
-      err = WSAGetLastError();
+      err = getNetErr();
       break;
     }
     return;
@@ -141,27 +177,25 @@ void AmqpHandler::loop() {
 
     FD_SET(m_impl->sock, &m_impl->readfds);
     FD_SET(m_impl->sock, &m_impl->writefds);
-
+#ifdef WIN_NET
     err = select(0, &m_impl->readfds, &m_impl->writefds, NULL, &m_impl->timeout);
-
+#else
+    err = select(m_impl->sock + 1, &m_impl->readfds, &m_impl->writefds, NULL, &m_impl->timeout);
+#endif
     if (err == SOCKET_ERROR) {
-      printf("Select error: %d\n", WSAGetLastError());
+      printf("Select error: %d\n", getNetErr());
       break;
-    } else if (err == 0) {
-      // Timeout
-      // printf("Timeout occurred. No data received or sent.\n");
     } else {
       // Check if data is available for reading
       if (FD_ISSET(m_impl->sock, &m_impl->readfds)) {
-        unsigned long bytesAvailable = 0;
-        ioctlsocket(m_impl->sock, FIONREAD, &bytesAvailable);
+        unsigned long bytesAvailable = m_impl->tmpBuff.size();
 
         if (m_impl->tmpBuff.size() < bytesAvailable) {
           m_impl->tmpBuff.resize(bytesAvailable, 0);
         }
 
         int bytesRead = recv(m_impl->sock, &m_impl->tmpBuff[0], bytesAvailable, 0);
-        m_impl->inputBuffer.write(m_impl->tmpBuff.data(), bytesAvailable);
+        m_impl->inputBuffer.write(m_impl->tmpBuff.data(), bytesRead);
       }
 
       if (m_impl->connection && m_impl->inputBuffer.available()) {
@@ -185,7 +219,7 @@ void AmqpHandler::loop() {
 }
 
 AmqpHandler::~AmqpHandler() {
-  close();
+  close_handler();
   for (int i = 0; i < m_impl->heartbeaters.size(); i++) {
     m_impl->heartbeaters[i].wait();
   }
@@ -193,10 +227,12 @@ AmqpHandler::~AmqpHandler() {
 }
 void AmqpHandler::quit() { m_impl->quit = true; }
 
-void AmqpHandler::AmqpHandler::close() {
+void AmqpHandler::AmqpHandler::close_handler() {
 
   closesocket(m_impl->sock);
+#ifdef WIN_NET
   WSACleanup();
+#endif
 }
 // Should run async
 void AmqpHandler::heartbeater(AMQP::Connection *connection, uint16_t interval) {
@@ -263,7 +299,7 @@ void AmqpHandler::sendDataFromBuffer() {
     // but read can be in critial sections
     m_impl->lastMessage.store(std::chrono::high_resolution_clock::now());
 
-    send(m_impl->sock, m_impl->outBuffer.data(), (int)m_impl->outBuffer.available(), 0);
+    auto ret = send(m_impl->sock, m_impl->outBuffer.data(), (int)m_impl->outBuffer.available(), 0);
     m_impl->outBuffer.drain();
   }
 }

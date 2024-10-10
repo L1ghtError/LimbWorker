@@ -24,7 +24,7 @@ private:
   AmqpHandler(const AmqpHandler &) = delete;
   AmqpHandler &operator=(const AmqpHandler &) = delete;
 
-  void close();
+  void close_handler();
   void sendDataFromBuffer();
   void heartbeater(AMQP::Connection *connection, uint16_t interv);
   /**
