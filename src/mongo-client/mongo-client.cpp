@@ -9,6 +9,30 @@ MongoService *mongoService = nullptr;
 
 MongoService::MongoService(const char *_dbname, mongoc_client_pool_t *_cpool) : dbname(_dbname), cpool(_cpool) {}
 
+liret MongoService::ping(bson_error_t *error) {
+  mongoc_client_t *client = nullptr;
+  liret ret = liret::kOk;
+  bson_t ping = BSON_INITIALIZER;
+  BSON_APPEND_INT32(&ping, "ping", 1);
+  do {
+    client = mongoc_client_pool_pop(this->cpool);
+    if (client == nullptr) {
+      ret = liret::kUninitialized;
+      break;
+    }
+    bool r = mongoc_client_command_simple(client, dbname, &ping, NULL, NULL, error);
+
+    if (!r) {
+      ret = liret::kAborted;
+      break;
+    }
+    break;
+  } while (0);
+  if (client != nullptr) {
+    mongoc_client_pool_push(cpool, client);
+  }
+  return ret;
+}
 liret MongoService::getImageById(const bson_oid_t *oid, unsigned char **filedata, ssize_t *filesize) {
   mongoc_client_t *client = nullptr;
   mongoc_database_t *database = nullptr;
@@ -134,7 +158,7 @@ liret MongoService::updateImageById(const bson_oid_t *oid, unsigned char *fileda
     }
 
     bson_t query = BSON_INITIALIZER;
-    BSON_APPEND_OID(&query, "_id",oid);
+    BSON_APPEND_OID(&query, "_id", oid);
     bson_error_t error = {0};
     file = mongoc_gridfs_find_one(gridfs, &query, &error);
     if (error.code == MONGOC_ERROR_GRIDFS_BUCKET_FILE_NOT_FOUND) {
@@ -146,7 +170,7 @@ liret MongoService::updateImageById(const bson_oid_t *oid, unsigned char *fileda
       break;
     }
     // fname cleanup automatic
-    const char * fname = mongoc_gridfs_file_get_filename(file);
+    const char *fname = mongoc_gridfs_file_get_filename(file);
     const bson_t *metadata = mongoc_gridfs_file_get_metadata(file);
     bson_value_t oid_value;
     oid_value.value_type = BSON_TYPE_OID;
@@ -156,7 +180,7 @@ liret MongoService::updateImageById(const bson_oid_t *oid, unsigned char *fileda
       ret = liret::kUnknown;
       break;
     }
-    
+
     mongoc_stream_gridfs_new(file);
     bson_t options = BSON_INITIALIZER;
     BSON_APPEND_DOCUMENT(&options, "metadata", metadata);
@@ -171,11 +195,11 @@ liret MongoService::updateImageById(const bson_oid_t *oid, unsigned char *fileda
     ssize_t total = 0;
     // To prevent unnessesary branching after loop just load rest of the image
     for (int i = 0; i < totalChunks; i++) {
-      ssize_t r =mongoc_stream_write(stream, filedata + (chunkSize * i), chunkSize, 0);
+      ssize_t r = mongoc_stream_write(stream, filedata + (chunkSize * i), chunkSize, 0);
       total += r;
     }
     if (restChunk > 0) {
-      ssize_t r =mongoc_stream_write(stream, (filedata) + (filesize - restChunk), restChunk, 0);
+      ssize_t r = mongoc_stream_write(stream, (filedata) + (filesize - restChunk), restChunk, 0);
       total += r;
     }
   } while (0);

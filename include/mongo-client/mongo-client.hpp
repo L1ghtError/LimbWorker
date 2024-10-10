@@ -13,6 +13,7 @@ public:
   static int mongoTest();
   liret getImageById(const bson_oid_t *oid, unsigned char **filedata, ssize_t *filesize);
   liret updateImageById(const bson_oid_t *oid, unsigned char *filedata, ssize_t filesize);
+  liret ping(bson_error_t *error);
 
 private:
   mongoc_client_pool_t *cpool;

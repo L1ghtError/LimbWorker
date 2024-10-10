@@ -18,7 +18,7 @@ int main(int argc, char **argv) {
   ncnn::create_gpu_instance();
 
   bson_error_t error = {0};
-  const char *uri_string = "mongodb://192.168.1.100:8005/?appname=client-example";
+  const char *uri_string = "mongodb://192.168.31.79:8005/?appname=client-example";
   mongoc_uri_t *uri;
   uri = mongoc_uri_new_with_error(uri_string, &error);
 
@@ -34,8 +34,15 @@ int main(int argc, char **argv) {
   if (!pool) {
     return EXIT_FAILURE;
   }
-  limb::mongoService = new limb::MongoService("LimbDB", pool);
 
+  limb::mongoService = new limb::MongoService("LimbDB", pool);
+  liret err = limb::mongoService->ping(&error);
+  if (err != liret::kOk) {
+    fprintf(stderr,
+            "failed to ping: %s\n"
+            "error message:  %s\n",
+            uri_string, error.message);
+  }
   // Initialise ImageSerice
   limb::imageService = new limb::ImageService;
   limb::ImageServiceOptions opts;
@@ -52,7 +59,7 @@ int main(int argc, char **argv) {
   // Rabbitmq
   AmqpConfig amqpConf;
   amqpConf.heartbeat = 60;
-  AmqpHandler handler("192.168.1.103", 5672, &amqpConf);
+  AmqpHandler handler("192.168.31.103", 5672, &amqpConf);
   AMQP::Connection connection(&handler, AMQP::Login("test", "test"), "/");
   AMQP::Channel ch(&connection);
   liret ret = setRoutes(connection, ch);
