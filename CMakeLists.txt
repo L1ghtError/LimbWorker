@@ -62,6 +62,7 @@ add_definitions(-DNOMINMAX)
 #options
 option(USE_SYSTEM_NCNN "build with system libncnn" OFF)
 option(USE_SYSTEM_AMQP_CPP "build with system AMQP-CPP" OFF)
+option(USE_SYSTEM_MONGO_C_DRIVER "build with system mongoc" ON) # only optoin for now
 
 # build type used in path determination
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -82,31 +83,27 @@ include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 
 include_directories("Dependencies/AMQP-CPP/include")
 
-include_directories("Dependencies/mongo/${BUILD_ROUTE}/include/libbson-1.0")
-include_directories("Dependencies/mongo/${BUILD_ROUTE}/include/libmongoc-1.0")
-
 #libs
 link_directories("Dependencies/AMQP-CPP/build-debug/bin/")
 link_directories("Dependencies/AMQP-CPP/build-release/bin/")
 
-link_directories("Dependencies/mongo/${BUILD_ROUTE}/lib")
+# Link MONGO-C-DRIVER
+if(USE_SYSTEM_MONGO_C_DRIVER)
+    # TODO: test on linux
+    find_package(mongoc-1.0 REQUIRED)
+    # if(NOT TARGET mongoc)
+    #     message(FATAL_ERROR "mongoc-1.0 target not found!")
+    #     set(USE_SYSTEM_MONGO_C_DRIVER OFF)
+    # endif()
+endif()
 
-#dlls
-
-set(MONGO_DLL_SOURCE_DIR ${CMAKE_SOURCE_DIR}/Dependencies/mongo/${BUILD_ROUTE}/bin)
-file(GLOB DLL_FILES_MONGO "${MONGO_DLL_SOURCE_DIR}/*.dll" )
-set(COPY_FILES_MONGO ${DLL_FILES_MONGO})
-
-# Set the directory where DLLs will be copied to
-set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR})
-set(DLL_DESTINATION_DIR ${EXECUTABLE_OUTPUT_PATH})
 
 # Link AMQP-CPP
 if(USE_SYSTEM_AMQP_CPP)
     # TODO: test on linux
     find_package(amqpcpp)
     if(NOT TARGET amqpcpp)
-        message(WARNING "ncnn target not found! USE_SYSTEM_NCNN will be turned off.")
+        message(WARNING "amqpcpp target not found! USE_SYSTEM_AMQP_CPP will be turned off.")
         set(USE_SYSTEM_AMQP_CPP OFF)
     endif()
 endif()
@@ -245,15 +242,5 @@ file(GLOB_RECURSE SOURCES RELATIVE ${CMAKE_SOURCE_DIR} "src/*")
 add_executable(LimbMediaService  ${SOURCES})
 add_dependencies(LimbMediaService generate-spirv)
 # Link libraries
-target_link_libraries(LimbMediaService PRIVATE ncnn amqpcpp
-    "mongoc-1.0" "bson-1.0"
-)
-
-# copy dlls to out directory
-list(APPEND DLL_FILES ${COPY_FILES_MONGO})
-
-add_custom_command(TARGET LimbMediaService POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-    ${DLL_FILES} ${DLL_DESTINATION_DIR}
-    COMMENT "Copying DLLs to executable directory..."
+target_link_libraries(LimbMediaService PRIVATE ncnn amqpcpp mongo::mongoc_shared
 )
