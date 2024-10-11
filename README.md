@@ -8,13 +8,11 @@ Works with [Backend](https://github.com/L1ghtError/LimbService).
 > **Develop in progress**
 
 > [!WARNING]  
-> Application is **NOT** event Alpha
-> It still **NOT** tested on linux
-> There is **NO** Multithreading
-> Also can it can **CRUSH** if usesr pass image with wrong format
-> All server configuration is **HardCoded**
-> Only **precompiled** version of mongo-c-driver is sutable
-> Debug is only working mode
+> Application is **NOT** event Alpha.
+> There is **NO** Multithreading.
+> Also it can **CRUSH** if usesr pass image with wrong format.
+> All server configuration is **HardCoded**.
+> Only **precompiled** version of mongo-c-driver is sutable.
 
 > [!TIP]
 > In current state it should be used only as example for your own improvments
