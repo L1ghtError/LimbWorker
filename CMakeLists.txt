@@ -242,5 +242,5 @@ file(GLOB_RECURSE SOURCES RELATIVE ${CMAKE_SOURCE_DIR} "src/*")
 add_executable(LimbMediaService  ${SOURCES})
 add_dependencies(LimbMediaService generate-spirv)
 # Link libraries
-target_link_libraries(LimbMediaService PRIVATE ncnn amqpcpp mongo::mongoc_shared
+target_link_libraries(LimbMediaService PRIVATE ncnn amqpcpp mongo::mongoc_static
 )
