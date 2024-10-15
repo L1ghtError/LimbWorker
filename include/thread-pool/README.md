@@ -1,0 +1,2 @@
+Original thread pool implementation is: [thread-pool-cpp](https://github.com/inkooboo/thread-pool-cpp) but just slightly tuned for personal needs.
+In addition to MPMC, an SPMC queue should also be suitable.

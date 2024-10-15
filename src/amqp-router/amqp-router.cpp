@@ -4,8 +4,8 @@
 
 #include "image-service/data-models.hpp"
 #include "image-service/image-service.hpp"
-#include <chrono>
-
+#include "utils/estimate.h"
+#include <future>
 char *extractBody(const AMQP::Message &message) {
   const int bodySize = message.bodySize();
   char *msg = new char[bodySize];
@@ -14,8 +14,7 @@ char *extractBody(const AMQP::Message &message) {
   return msg;
 }
 
-liret setRoutes(AMQP::Connection &conn, AMQP::Channel &ch) {
-  ch.setQos(1);
+liret setRoutes(limb::tp::ThreadPool &tp, AMQP::Connection &conn, AMQP::Channel &ch) {
   if (!ch.usable()) {
     return liret::kInvalidInput;
   }
@@ -63,56 +62,57 @@ liret setRoutes(AMQP::Connection &conn, AMQP::Channel &ch) {
   const char strUpscaleImage[] = "UpscaleImage";
   ch.declareQueue(strUpscaleImage);
 
-  ch.consume("")
-      .onReceived([&ch, strUpscaleImage](const AMQP::Message &message, uint64_t deliveryTag, bool redelivered) {
-        const char *body = extractBody(message);
-        limb::MUpscaleImage pbody;
-        pbody.berawtoh(body);
+  ch.consume("").onReceived([&ch, &tp](const AMQP::Message &message, uint64_t deliveryTag, bool redelivered) {
+    const char *body = extractBody(message);
+    limb::MUpscaleImage pbody;
+    pbody.berawtoh(body);
+    printf("Got connectoin %s|%s\n", message.correlationID().c_str(), message.replyTo().c_str());
 
-        printf("Got connectoin %s\n", message.correlationID().c_str());
-        // Progress response
-        int iteration = 0;
-        std::chrono::high_resolution_clock::time_point firstEnt;
-        auto progressCb = [&message, &iteration, &firstEnt, &ch, deliveryTag](float progress) {
-          if (iteration == 0) {
-            firstEnt = std::chrono::high_resolution_clock::now();
-          } else if (iteration == 2)
-          {
-            auto currentEnt = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<float, std::milli> duration = currentEnt - firstEnt;
-            char prog[32] = {0};
-            const float dur = duration.count();
-            float estimation = (dur / progress) - dur;
-            snprintf(prog, sizeof(prog), "%.2f:%.2fms", progress, estimation);
-            printf("Res-%s / %.2fms \n", prog, duration.count());
+    std::string correlationID = message.correlationID();
+    std::string replyTo = message.replyTo();
+    auto handler = [correlationID, replyTo, deliveryTag, body, pbody, &ch]() {
+      // Progress response callback
+      int iteration = 0;
+      std::chrono::high_resolution_clock::time_point firstEnt;
+      auto progressCb = [correlationID, replyTo, &iteration, &firstEnt, &ch](float progress) {
+        if (iteration == 0) {
+          firstEnt = std::chrono::high_resolution_clock::now();
+        } else if (iteration == 2) {
+          char prog[32] = {0};
+          float estimation = estimateProgress(firstEnt, progress);
+          snprintf(prog, sizeof(prog), "%.2f:%.2fms", progress, estimation);
+          printf("Res-%s \n", prog);
           AMQP::Envelope env(prog);
-          const std::string corId = message.correlationID();
-          const std::string repl = message.replyTo();
-          env.setCorrelationID(corId);
-          ch.publish("", repl, env);
-          }
-   
-          ++iteration;
-        };
 
-        
-          liret ret = limb::imageService->handleUpscaleImage(pbody, progressCb);
-        if (ret != liret::kOk) {
-            printf("Err upscale %s", listat::getErrorMessage(ret));
+          env.setCorrelationID(correlationID);
+          ch.publish("", replyTo, env);
         }
-        char end[] = "end";
-        AMQP::Envelope env(end);
+        ++iteration;
+      };
 
-        const std::string corId = message.correlationID();
-        const std::string repl = message.replyTo();
-        env.setCorrelationID(corId);
-        ch.publish("", repl, env);
-        auto currentEnt = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<float, std::milli> duration = currentEnt - firstEnt;
-        printf("sent %s / %.2fms \n", end, duration.count());
-        ch.ack(deliveryTag);
-        delete body;
-      });
+      liret ret = limb::imageService->handleUpscaleImage(pbody, progressCb);
+      if (ret != liret::kOk) {
+        printf("Err upscale %s\n", listat::getErrorMessage(ret));
+      }
+
+      AMQP::Envelope env(END_MESSAGE);
+      env.setCorrelationID(correlationID);
+
+      ch.publish("", replyTo, env);
+      auto currentEnt = std::chrono::high_resolution_clock::now();
+      std::chrono::duration<float, std::milli> duration = currentEnt - firstEnt;
+      printf("sent %s / %.2fms \n", END_MESSAGE, duration.count());
+      ch.ack(deliveryTag);
+      delete body;
+    };
+
+    std::packaged_task<void()> packedHandler(handler);
+    std::future<void> futureHandler = packedHandler.get_future();
+    if (tp.tryPost(packedHandler) == false) {
+      ch.reject(deliveryTag);
+      delete body;
+    }
+  });
 
   return liret::kOk;
 }

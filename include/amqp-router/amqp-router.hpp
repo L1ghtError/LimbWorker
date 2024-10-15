@@ -1,8 +1,12 @@
 #ifndef _AMQP_ROUTER_HPP_
 #define _AMQP_ROUTER_HPP_
-#include "utils/status.h"
 #include <amqpcpp.h>
 
-liret setRoutes(AMQP::Connection &conn, AMQP::Channel &ch);
+#include "thread-pool/thread-pool.hpp"
+#include "utils/status.h"
+
+const char END_MESSAGE[] = "end";
+
+liret setRoutes(limb::tp::ThreadPool &tp, AMQP::Connection &conn, AMQP::Channel &ch);
 
 #endif // _AMQP_ROUTER_HPP_

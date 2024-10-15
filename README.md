@@ -9,7 +9,6 @@ Works with [Backend](https://github.com/L1ghtError/LimbService).
 
 > [!WARNING]  
 > Application is **NOT** event Alpha.
-> There is **NO** Multithreading.
 > Also it can **CRUSH** if usesr pass image with wrong format.
 > All server configuration is **HardCoded**.
 > Only **precompiled** version of mongo-c-driver is sutable.
