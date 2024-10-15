@@ -30,6 +30,7 @@
 
 #define CONNECTION_TIMEOUT 5000   // 5 seconds
 #define HEARTBEAT_RESOLUTION 1000 // 1 second
+#define DEFAULT_HEARTBEAT 10      // 10 seconds
 class Buffer {
 public:
   Buffer(size_t size) : m_data(size, 0), m_use(0) {}
@@ -266,7 +267,7 @@ uint16_t AmqpHandler::onNegotiate(AMQP::Connection *connection, uint16_t interva
     return 0;
   }
   interval = interval < m_impl->conf->heartbeat ? interval : m_impl->conf->heartbeat;
-  interval = interval < 10 ? 10 : interval;
+  interval = interval < DEFAULT_HEARTBEAT ? DEFAULT_HEARTBEAT : interval;
   m_impl->heartbeaters.emplace_back(std::async(&AmqpHandler::heartbeater, this, connection, interval));
   return interval;
 }

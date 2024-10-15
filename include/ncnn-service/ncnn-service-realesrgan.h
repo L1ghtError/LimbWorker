@@ -8,7 +8,9 @@ public:
   RealesrganService(ncnn::Net *net, bool tta_mode = false);
   ~RealesrganService();
   liret load() override;
-  liret process_matrix(const ncnn::Mat &inimage, ncnn::Mat &outimage, const ProgressCallback &&procb) const override;
+  liret process_matrix(
+      const ncnn::Mat &inimage, ncnn::Mat &outimage,
+      const ProgressCallback &&procb = [](float val) { printf("%.2f\n", val); }) const override;
 
 public:
   int scale;
