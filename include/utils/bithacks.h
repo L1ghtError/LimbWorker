@@ -8,6 +8,8 @@
  * @return nearest greater equal power of 2.
  */
 uint32_t nextPowerOfTwo(uint32_t v) {
+  if (v <= 2)
+    return 2;
   v--;
   v |= v >> 1;
   v |= v >> 2;
