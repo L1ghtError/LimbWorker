@@ -3,19 +3,9 @@
 #include "mongo-client/mongo-client.hpp"
 
 #include "ncnn-service/ncnn-service-realesrgan.h"
-
 #define STB_IMAGE_IMPLEMENTATION
-#define STBI_NO_PSD
-#define STBI_NO_TGA
-#define STBI_NO_GIF
-#define STBI_NO_HDR
-#define STBI_NO_PIC
-// #define STBI_NO_STDIO
-#include "stb-image/stb_image.h"
-#ifndef STB_IMAGE_WRITE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb-image/stb_image_write.h"
-#endif
+#include "utils/stb-include.h"
 
 namespace limb {
 
@@ -55,7 +45,7 @@ liret ImageService::handleUpscaleImage(const MUpscaleImage &input, const Progres
   int outSize = 0;
   uint8_t *outImage =
       stbi_write_png_to_mem((uint8_t *)outimage.data, 0, outimage.w, outimage.h, outimage.elempack, &outSize);
-  
+
   ret = limb::mongoService->updateImageById(&imageId, outImage, outSize);
   if (ret != liret::kOk) {
     return ret;
@@ -84,9 +74,10 @@ liret ImageService::addOption(const ImageServiceOptions &opt) {
     return liret::kInvalidInput;
   }
 
+  // Update existing serivce
   for (int i = 0; i < m_services.size(); i++) {
     if (m_services[i].type == opt.type) {
-      // if someone allowed to push unalocated net inside m_services
+      // if someone pushed unalocated net inside m_services
       // thats mean we have some troubles
       delete m_services[i].net;
       m_services[i] = opt;
