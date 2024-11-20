@@ -1,0 +1,13 @@
+cmake_minimum_required (VERSION 3.5)
+#tests
+
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+
+function(build_test test_name)
+    add_executable(${test_name}_test ${ARGN}) 
+    target_link_libraries(${test_name}_test PRIVATE gtest gtest_main lib_dependencies)
+    add_test(${test_name} ./${test_name}_test)
+endfunction()
+
+build_test(fixed_function fixed_function.t.cpp)
+build_test(thread_pool thread_pool.t.cpp)

@@ -64,6 +64,8 @@ option(USE_SYSTEM_NCNN "build with system libncnn" OFF)
 option(USE_SYSTEM_AMQP_CPP "build with system AMQP-CPP" OFF)
 option(USE_SYSTEM_MONGO_C_DRIVER "build with system mongoc" ON) # only optoin for now
 
+option(ENABLE_TESTS "build with tests" ON)
+
 # build type used in path determination
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(BUILD_ROUTE "debug")
@@ -73,10 +75,11 @@ endif()
 
 set(NCNN_ROOTDIR "Dependencies/ncnn")
 set(AMQP_CPP_ROOTDIR "Dependencies/AMQP-CPP")
+set(GTEST_ROOTDIR "Dependencies/googletest")
 ## Some of commands need absolute path to be executed
 set(ABSOLUTE_NCNN_ROOTDIR "${CMAKE_CURRENT_SOURCE_DIR}/${NCNN_ROOTDIR}")
 set(ABSOLUTE_AMQP_CPP_ROOTDIR "${CMAKE_CURRENT_SOURCE_DIR}/${AMQP_CPP_ROOTDIR}")
-
+set(ABSOLUTE_GTEST_ROOTDIR "${CMAKE_CURRENT_SOURCE_DIR}/${GTEST_ROOTDIR}")
 #includes
 include_directories("include")
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
@@ -237,10 +240,23 @@ compile_shader("${REALESRGAN_SOURCES_PATH}/realesrgan_postproc.comp")
 compile_shader("${REALESRGAN_SOURCES_PATH}/realesrgan_preproc_tta.comp")
 compile_shader("${REALESRGAN_SOURCES_PATH}/realesrgan_postproc_tta.comp")
 add_custom_target(generate-spirv DEPENDS ${SHADER_SPV_HEX_FILES})
+# Libs
+add_library(lib_dependencies INTERFACE)
+target_link_libraries(lib_dependencies INTERFACE ncnn amqpcpp mongo::mongoc_static)
+# Tests
+if (ENABLE_TESTS)
+    if (NOT EXISTS "${ABSOLUTE_GTEST_ROOTDIR}/CMakeLists.txt")
+        message(FATAL_ERROR "${ABSOLUTE_GTEST_ROOTDIR}/CMakeLists.txt not found! Ensure that the submodules are downloaded.")
+    endif()
+    # Enable CTest for running tests
+    enable_testing()
+
+    add_subdirectory("${GTEST_ROOTDIR}")
+    add_subdirectory("tests")
+endif()
 # Add sources
 file(GLOB_RECURSE SOURCES RELATIVE ${CMAKE_SOURCE_DIR} "src/*")
-add_executable(LimbMediaService  ${SOURCES})
-add_dependencies(LimbMediaService generate-spirv)
+add_executable(service  ${SOURCES})
+add_dependencies(service generate-spirv)
 # Link libraries
-target_link_libraries(LimbMediaService PRIVATE ncnn amqpcpp mongo::mongoc_static
-)
+target_link_libraries(service PRIVATE lib_dependencies)
