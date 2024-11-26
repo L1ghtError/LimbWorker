@@ -120,7 +120,13 @@ int main(int argc, char **argv) {
   opts.tta_mode = false;
   opts.vulkan_device_index = ncnn::get_default_gpu_index();
   opts.type = IP_IMAGE_REALESRGAN;
-  limb::imageService->addOption(opts);
+  err = limb::imageService->addOption(opts);
+  if (err != liret::kOk) {
+    fprintf(stderr,
+            "failed to add option: %s\n"
+            "error message:  %s\n",
+            uri_string, error.message);
+  }
 
 // Tests
 #ifdef INTEGRATIONAL_TEST
