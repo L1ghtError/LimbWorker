@@ -4,23 +4,22 @@
 
 Works with [Backend](https://github.com/L1ghtError/LimbService).
 
-<div style="border-left: 4px solid #2196F3; padding: 0.5em; background: #f1f9ff;">
-  <strong>NOTE:</strong> Develop in progress.
-</div>
+> **NOTE:**  
+> Develop in progress.
 
-<div style="border-left: 4px solid #FF9800; padding: 0.5em; background: #fff3e0; margin-top: 1em;">
-  <strong>WARNING:</strong>
-  <ul>
-    <li>Application is <strong>NOT</strong> even Alpha.</li>
-    <li>It can <strong>CRASH</strong> if the user passes an image with the wrong format.</li>
-    <li>All server configuration is <strong>Hardcoded</strong>.</li>
-    <li>Only the <strong>precompiled</strong> version of <code>mongo-c-driver</code> is suitable.</li>
-  </ul>
-</div>
+---
 
-<div style="border-left: 4px solid #4CAF50; padding: 0.5em; background: #f0fdf4; margin-top: 1em;">
-  <strong>TIP:</strong> In its current state, it should be used only as an example for your own improvements.
-</div>
+> **WARNING:**  
+> - Application is **NOT** even Alpha.  
+> - It can **CRASH** if the user passes an image with the wrong format.  
+> - All server configuration is **Hardcoded**.  
+> - Only the **precompiled** version of `mongo-c-driver` is suitable.
+
+---
+
+> **TIP:**  
+> In its current state, it should be used only as an example for your own improvements.
+
 
 ### How to build
 
