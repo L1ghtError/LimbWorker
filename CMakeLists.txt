@@ -3,8 +3,10 @@ set(CMAKE_CXX_STANDARD 17)
 project (LimbMediaService VERSION 1.0 LANGUAGES C CXX)
 #finds
 
-# maybe needed
-# find_package(Threads)
+# Threads
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+# Vulkan
 find_package(Vulkan REQUIRED)
 #macros
 find_program(GLSLANGVALIDATOR_EXECUTABLE NAMES glslangValidator PATHS $ENV{VULKAN_SDK}/bin NO_CMAKE_FIND_ROOT_PATH)
@@ -83,8 +85,8 @@ set(ABSOLUTE_GTEST_ROOTDIR "${CMAKE_CURRENT_SOURCE_DIR}/${GTEST_ROOTDIR}")
 #includes
 include_directories("include")
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
-
 include_directories("Dependencies/AMQP-CPP/include")
+include_directories("Dependencies/abnet/include")
 
 #libs
 link_directories("Dependencies/AMQP-CPP/build-debug/bin/")
@@ -242,7 +244,7 @@ compile_shader("${REALESRGAN_SOURCES_PATH}/realesrgan_postproc_tta.comp")
 add_custom_target(generate-spirv DEPENDS ${SHADER_SPV_HEX_FILES})
 # Libs
 add_library(lib_dependencies INTERFACE)
-target_link_libraries(lib_dependencies INTERFACE ncnn amqpcpp mongo::mongoc_static)
+target_link_libraries(lib_dependencies INTERFACE ncnn amqpcpp mongo::mongoc_static Threads::Threads)
 # Tests
 if (ENABLE_TESTS)
     if (NOT EXISTS "${ABSOLUTE_GTEST_ROOTDIR}/CMakeLists.txt")
