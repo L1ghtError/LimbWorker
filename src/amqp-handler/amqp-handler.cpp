@@ -6,27 +6,7 @@
 #include <mutex>
 #include <thread>
 
-#if (defined(_WIN16) || defined(_WIN32) || defined(_WIN64) || defined(__WINDOWS__)) && !defined(__CYGWIN__)
-#define WIN_NET
-#define _CRT_SECURE_NO_WARNINGS
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#pragma comment(lib, "ws2_32.lib")
-#else
-#include <arpa/inet.h>
-#include <fcntl.h>
-#include <netinet/in.h>
-#include <sys/ioctl.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <unistd.h>
-#define SOCKET int
-#define INVALID_SOCKET (SOCKET)(~0)
-#define SOCKET_ERROR (-1)
-#define closesocket close
-#define ioctlsocket fcntl
-#define SOCKADDR sockaddr
-#endif
+#include "abnet/abnet.hpp"
 
 #define CONNECTION_TIMEOUT 5000   // 5 seconds
 #define HEARTBEAT_RESOLUTION 1000 // 1 second
@@ -65,13 +45,6 @@ private:
   size_t m_use;
 };
 
-int getNetErr() {
-#ifdef WIN_NET
-  return WSAGetLastError();
-#endif
-  return errno;
-}
-
 struct AmqpHandlerImpl {
   AmqpHandlerImpl(const AmqpConfig *_conf = nullptr)
       : connected(false), connection(nullptr), quit(false), keepAlive(true), inputBuffer(AmqpHandler::BUFFER_SIZE),
@@ -81,25 +54,14 @@ struct AmqpHandlerImpl {
       static const AmqpConfig defaultConf = {60};
       conf = &defaultConf;
     }
-    timeout.tv_sec = 0;
-    timeout.tv_usec = 10000;
   }
-
-#ifdef WIN_NET
-  bool keepAlive = true;
-  WSADATA wsaData;
-#else
-  int keepAlive = true;
-#endif
-  fd_set readfds, writefds;
-  struct timeval timeout;
 
   Buffer inputBuffer;
   Buffer outBuffer;
-  SOCKET sock;
+  abnet::socket_type sock;
   AMQP::Connection *connection;
   std::vector<char> tmpBuff;
-  bool connected;
+
   const AmqpConfig *conf;
 
   std::atomic<bool> quit;
@@ -110,107 +72,95 @@ struct AmqpHandlerImpl {
   std::mutex writeMtx;
   // for cleaunp
   std::vector<std::future<void>> heartbeaters;
+
+  int keepAlive = true;
+  int reuseAddr = true;
+  bool connected;
 };
 
 AmqpHandler::AmqpHandler(const char *host, uint16_t port, const AmqpConfig *conf) : m_impl(new AmqpHandlerImpl(conf)) {
+  int err = 0;
+  abnet::error_code ec;
   do {
-    int err = 0;
-
-#ifdef WIN_NET
-    const int timeout = CONNECTION_TIMEOUT;
-    err = WSAStartup(MAKEWORD(2, 2), &m_impl->wsaData);
-    if (err != 0) {
-      break;
-    }
-#else
-    timeval timeout;
-    timeout.tv_usec = 0;
-    timeout.tv_sec = CONNECTION_TIMEOUT / 1000;
-#endif
+    abnet::sockaddr_in4_type service;
     // Sock creation
-    sockaddr_in service;
-    service.sin_family = AF_INET;
-    if (inet_pton(AF_INET, host, &service.sin_addr.s_addr) != 1) {
+    service.sin_family = ABNET_OS_DEF(AF_INET);
+    service.sin_port = abnet::socket_ops::host_to_network_short(port);
+    abnet::socket_ops::inet_pton(ABNET_OS_DEF(AF_INET), host, &service.sin_addr, 0, ec);
+    if (ec.value() != 0) {
       break;
     }
-    service.sin_port = htons(port);
-
-    m_impl->sock = socket(service.sin_family, SOCK_STREAM, IPPROTO_TCP);
-    if (m_impl->sock == INVALID_SOCKET) {
-      break;
-    }
-
-    // Set receive timeout (SO_RCVTIMEO) to 5 seconds
-    if (setsockopt(m_impl->sock, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout, sizeof(timeout)) < 0) {
-      auto res = getNetErr();
+    m_impl->sock =
+        abnet::socket_ops::socket(service.sin_family, ABNET_OS_DEF(SOCK_STREAM), ABNET_OS_DEF(IPPROTO_TCP), ec);
+    if (ec.value() != 0) {
       break;
     }
 
-    // Set send timeout (SO_SNDTIMEO) to 5 seconds (optional)
-    if (setsockopt(m_impl->sock, SOL_SOCKET, SO_SNDTIMEO, (const char *)&timeout, sizeof(timeout)) < 0) {
+    abnet::socket_ops::setsockopt(m_impl->sock, 0, ABNET_OS_DEF(SOL_SOCKET), ABNET_OS_DEF(SO_REUSEADDR),
+                                  &m_impl->reuseAddr, sizeof(m_impl->reuseAddr), ec);
+    if (ec.value() != 0) {
       break;
     }
 
-    err = setsockopt(m_impl->sock, SOL_SOCKET, SO_KEEPALIVE, (char *)&m_impl->keepAlive, sizeof(m_impl->keepAlive));
-    if (err == SOCKET_ERROR) {
-      auto res = getNetErr();
+    abnet::socket_ops::setsockopt(m_impl->sock, 0, ABNET_OS_DEF(SOL_SOCKET), ABNET_OS_DEF(SO_KEEPALIVE),
+                                  &m_impl->keepAlive, sizeof(m_impl->keepAlive), ec);
+    if (ec.value() != 0) {
       break;
     }
 
-    err = connect(m_impl->sock, (SOCKADDR *)&service, sizeof(service));
-    if (err == SOCKET_ERROR) {
-      err = getNetErr();
+    abnet::socket_ops::connect(m_impl->sock, reinterpret_cast<abnet::socket_addr_type *>(&service), sizeof(service),
+                               ec);
+    if (ec.value() != 0) {
       break;
     }
+
     return;
   } while (0);
-  if (m_impl->sock != INVALID_SOCKET) {
-    closesocket(m_impl->sock);
+  if (m_impl->sock != abnet::invalid_socket) {
+    abnet::socket_ops::close(m_impl->sock, 0, 0, ec);
   }
-  m_impl->sock = INVALID_SOCKET;
+  m_impl->sock = abnet::invalid_socket;
 }
 
 void AmqpHandler::loop() {
-  int err = 0;
-  while (!m_impl->quit) {
-    FD_ZERO(&m_impl->readfds);
-    FD_ZERO(&m_impl->writefds);
+  int poll_res = 0;
+  abnet::error_code ec;
 
-    FD_SET(m_impl->sock, &m_impl->readfds);
-    FD_SET(m_impl->sock, &m_impl->writefds);
-#ifdef WIN_NET
-    err = select(0, &m_impl->readfds, &m_impl->writefds, NULL, &m_impl->timeout);
-#else
-    err = select(m_impl->sock + 1, &m_impl->readfds, &m_impl->writefds, NULL, &m_impl->timeout);
-#endif
-    if (err == SOCKET_ERROR) {
-      printf("Select error: %d\n", getNetErr());
+  while (!m_impl->quit) {
+
+    poll_res = abnet::socket_ops::poll_read(m_impl->sock, 0, 10000, ec);
+    if (poll_res == abnet::socket_error_retval) {
+      abnet::socket_ops::get_last_error(ec, 0);
+      printf("Select error: %s\n", ec.message().c_str());
       break;
     } else {
       // Check if data is available for reading
-      if (FD_ISSET(m_impl->sock, &m_impl->readfds)) {
-        unsigned long bytesAvailable = m_impl->tmpBuff.size();
+      size_t bytesAvailable = m_impl->tmpBuff.size();
 
-        if (m_impl->tmpBuff.size() < bytesAvailable) {
-          m_impl->tmpBuff.resize(bytesAvailable, 0);
-        }
-
-        int bytesRead = recv(m_impl->sock, &m_impl->tmpBuff[0], bytesAvailable, 0);
-        m_impl->inputBuffer.write(m_impl->tmpBuff.data(), bytesRead);
+      if (m_impl->tmpBuff.size() < bytesAvailable) {
+        m_impl->tmpBuff.resize(bytesAvailable, 0);
+      }
+      size_t bytesRead = abnet::socket_ops::recv1(m_impl->sock, &m_impl->tmpBuff[0], bytesAvailable, 0, ec);
+      if (bytesRead > bytesAvailable || bytesRead <= 0) {
+        printf("Recv error: %s\n", ec.message().c_str());
+        break;
       }
 
-      if (m_impl->connection && m_impl->inputBuffer.available()) {
-        size_t count = m_impl->connection->parse(m_impl->inputBuffer.data(), m_impl->inputBuffer.available());
-
-        if (count == m_impl->inputBuffer.available()) {
-          m_impl->inputBuffer.drain();
-        } else if (count > 0) {
-          m_impl->inputBuffer.shl(count);
-        }
-      }
-      // sendDataFromBuffer();
+      m_impl->inputBuffer.write(m_impl->tmpBuff.data(), bytesRead);
     }
+
+    if (m_impl->connection && m_impl->inputBuffer.available()) {
+      size_t count = m_impl->connection->parse(m_impl->inputBuffer.data(), m_impl->inputBuffer.available());
+
+      if (count == m_impl->inputBuffer.available()) {
+        m_impl->inputBuffer.drain();
+      } else if (count > 0) {
+        m_impl->inputBuffer.shl(count);
+      }
+    }
+    // sendDataFromBuffer();
   }
+
   if (m_impl->quit == 0) {
     printf("Network loop force quit!\n");
   }
@@ -229,12 +179,10 @@ AmqpHandler::~AmqpHandler() {
 void AmqpHandler::quit() { m_impl->quit = true; }
 
 void AmqpHandler::AmqpHandler::close_handler() {
-
-  closesocket(m_impl->sock);
-#ifdef WIN_NET
-  WSACleanup();
-#endif
+  abnet::error_code ec;
+  abnet::socket_ops::close(m_impl->sock, 0, 0, ec);
 }
+
 // Should run async
 void AmqpHandler::heartbeater(AMQP::Connection *connection, uint16_t interval) {
   std::chrono::high_resolution_clock::time_point lastSent = std::chrono::high_resolution_clock::now();
@@ -299,8 +247,11 @@ void AmqpHandler::sendDataFromBuffer() {
     // mesure time for heartbeat, in this case its not nessesary to be atomic
     // but read can be in critial sections
     m_impl->lastMessage.store(std::chrono::high_resolution_clock::now());
-
-    auto ret = send(m_impl->sock, m_impl->outBuffer.data(), (int)m_impl->outBuffer.available(), 0);
+    abnet::error_code ec;
+    abnet::socket_ops::send1(m_impl->sock, m_impl->outBuffer.data(), m_impl->outBuffer.available(), 0, ec);
+    if (ec.value() != 0) {
+      printf("Error send: %s", ec.message().c_str());
+    }
     m_impl->outBuffer.drain();
   }
 }

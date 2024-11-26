@@ -105,7 +105,7 @@ liret ImageService::imageProcessorNew(IMAGE_PROCESSOR_TYPES type, NcnnService **
   }
 
   switch (type) {
-  case IP_IMAGE_REALESRGAN:
+  case IP_IMAGE_REALESRGAN: {
     RealesrganService *service = new RealesrganService(optr->net, optr->tta_mode);
     service->load();
     service->tilesize = optr->tilesize;
@@ -113,6 +113,11 @@ liret ImageService::imageProcessorNew(IMAGE_PROCESSOR_TYPES type, NcnnService **
     service->prepadding = optr->prepadding;
     *proc = service;
     break;
+  }
+  case IP_IMAGE_NO:
+    return liret::kUnknown;
+  default:
+    return liret::kInvalidInput;
   }
   return liret::kOk;
 }

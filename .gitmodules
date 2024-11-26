@@ -8,3 +8,7 @@
 [submodule "Dependencies/googletest"]
 	path = Dependencies/googletest
 	url = https://github.com/google/googletest.git
+[submodule "Dependencies/abnet"]
+	path = Dependencies/abnet
+	url = https://github.com/L1ghtError/abnet.git
+	branch = main
