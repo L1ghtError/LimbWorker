@@ -12,9 +12,10 @@ namespace limb {
 ImageService *imageService = nullptr;
 
 ImageService::~ImageService() {
-  for (int i = 0; i < m_services.size(); i++) {
-    delete m_services[i].net;
-  }
+  // TODO: investigate nessesity of manually manage .net lifetime
+  // for (int i = 0; i < m_services.size(); i++) {
+  //   delete m_services[i].net;
+  // }
 }
 liret ImageService::handleUpscaleImage(const MUpscaleImage &input, const ProgressCallback &&procb) {
   bson_oid_t imageId;
@@ -56,20 +57,7 @@ liret ImageService::handleUpscaleImage(const MUpscaleImage &input, const Progres
 
 liret ImageService::addOption(const ImageServiceOptions &opt) {
   // should be only allocated inside this functoin
-  ncnn::Net *net = new ncnn::Net;
-
-  net->opt.use_vulkan_compute = true;
-  net->opt.use_fp16_packed = true;
-  net->opt.use_fp16_storage = true;
-  net->opt.use_fp16_arithmetic = false;
-  net->opt.use_int8_storage = true;
-  net->opt.use_int8_arithmetic = false;
-
-  net->set_vulkan_device(opt.vulkan_device_index);
-
-  int err = net->load_param(opt.paramfullpath);
-  err |= net->load_model(opt.modelfullpath);
-
+  int err = 0;
   if (err != 0) {
     return liret::kInvalidInput;
   }
@@ -79,14 +67,14 @@ liret ImageService::addOption(const ImageServiceOptions &opt) {
     if (m_services[i].type == opt.type) {
       // if someone pushed unalocated net inside m_services
       // thats mean we have some troubles
-      delete m_services[i].net;
+      // delete m_services[i].net;
       m_services[i] = opt;
-      m_services[i].net = net;
+      // m_services[i].net = net;
       return liret::kOk;
     }
   }
   ImageServiceOptions newOpt = opt;
-  newOpt.net = net;
+  // newOpt.net = net;
   m_services.push_back(newOpt);
 
   return liret::kOk;

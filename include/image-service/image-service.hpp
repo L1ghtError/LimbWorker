@@ -11,9 +11,8 @@ namespace limb {
 class ImageService;
 struct ImageServiceOptions {
 private:
-  ncnn::Net *net;
-
 public:
+  ncnn::Net *net;
   const char *paramfullpath;
   const char *modelfullpath;
   IMAGE_PROCESSOR_TYPES type;

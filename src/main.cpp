@@ -108,19 +108,42 @@ int main(int argc, char **argv) {
             "failed to ping: %s\n"
             "error message:  %s\n",
             uri_string, error.message);
+    return EXIT_FAILURE;
   }
+  // initialise opts_realesrgan
+  limb::ImageServiceOptions opts_realesrgan;
+  opts_realesrgan.paramfullpath = "../models/realesrgan-x4plus.param";
+  opts_realesrgan.modelfullpath = "../models/realesrgan-x4plus.bin";
+  opts_realesrgan.scale = 4;
+  opts_realesrgan.tilesize = 200;
+  opts_realesrgan.prepadding = 10;
+  opts_realesrgan.tta_mode = false;
+  opts_realesrgan.vulkan_device_index = ncnn::get_default_gpu_index();
+  opts_realesrgan.type = IP_IMAGE_REALESRGAN;
+
+  ncnn::Net net;
+  net.opt.use_vulkan_compute = true;
+  net.opt.use_fp16_packed = true;
+  net.opt.use_fp16_storage = true;
+  net.opt.use_fp16_arithmetic = false;
+  net.opt.use_int8_storage = true;
+  net.opt.use_int8_arithmetic = false;
+  net.set_vulkan_device(opts_realesrgan.vulkan_device_index);
+
+  int nerr = net.load_param(opts_realesrgan.paramfullpath);
+  nerr |= net.load_model(opts_realesrgan.modelfullpath);
+  if (nerr != 0) {
+    fprintf(stderr,
+            "failed to load net: %s\n"
+            "error message:  %s\n",
+            uri_string, error.message);
+    return EXIT_FAILURE;
+  }
+  opts_realesrgan.net = &net;
+
   // Initialise ImageSerice
   limb::imageService = new limb::ImageService;
-  limb::ImageServiceOptions opts;
-  opts.paramfullpath = "../models/realesrgan-x4plus.param";
-  opts.modelfullpath = "../models/realesrgan-x4plus.bin";
-  opts.scale = 4;
-  opts.tilesize = 200;
-  opts.prepadding = 10;
-  opts.tta_mode = false;
-  opts.vulkan_device_index = ncnn::get_default_gpu_index();
-  opts.type = IP_IMAGE_REALESRGAN;
-  err = limb::imageService->addOption(opts);
+  err = limb::imageService->addOption(opts_realesrgan);
   if (err != liret::kOk) {
     fprintf(stderr,
             "failed to add option: %s\n"
