@@ -47,6 +47,6 @@ Docker-compose:
 
 > **Tech stack:**
 >
-> - [ncnn](https://github.com/Tencent/ncnn) as web-framework
+> - [ncnn](https://github.com/Tencent/ncnn) as preferred inference runtime
 > - [mongo-c-driver](https://github.com/mongodb/mongo-c-driver) for communication with workers
 > - [AMQP-CPP](https://github.com/CopernicaMarketingSoftware/AMQP-CPP) for communication with MongoDb
