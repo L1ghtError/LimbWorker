@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 3.5)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 project (LimbMediaService VERSION 1.0 LANGUAGES C CXX)
 #finds
 
@@ -84,6 +84,7 @@ set(ABSOLUTE_AMQP_CPP_ROOTDIR "${CMAKE_CURRENT_SOURCE_DIR}/${AMQP_CPP_ROOTDIR}")
 set(ABSOLUTE_GTEST_ROOTDIR "${CMAKE_CURRENT_SOURCE_DIR}/${GTEST_ROOTDIR}")
 #includes
 include_directories("include")
+include_directories("processors")
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 include_directories("Dependencies/AMQP-CPP/include")
 include_directories("Dependencies/abnet/include")
@@ -258,7 +259,8 @@ if (ENABLE_TESTS)
 endif()
 # Add sources
 file(GLOB_RECURSE SOURCES RELATIVE ${CMAKE_SOURCE_DIR} "src/*")
-add_executable(service  ${SOURCES})
+file(GLOB_RECURSE MODULE_SOURCES RELATIVE ${CMAKE_SOURCE_DIR} "processors/*")
+add_executable(service  ${SOURCES} ${MODULE_SOURCES})
 add_dependencies(service generate-spirv)
 # Link libraries
 target_link_libraries(service PRIVATE lib_dependencies)

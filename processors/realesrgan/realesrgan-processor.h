@@ -1,15 +1,22 @@
 #ifndef _REALESRGAN_SERVICE_H_
 #define _REALESRGAN_SERVICE_H_
-#include "ncnn-service/ncnn-service.h"
+#include "image-processor.h"
+
+#include <gpu.h>
+#include <layer.h>
+#include <net.h>
 
 namespace limb {
-class RealesrganService : public NcnnService {
+class RealesrganProcessor : public ImageProcessor {
 public:
-  RealesrganService(ncnn::Net *net, bool tta_mode = false);
-  ~RealesrganService();
+  RealesrganProcessor(ncnn::Net *net, bool tta_mode = false);
+  ~RealesrganProcessor();
   liret load() override;
-  liret process_matrix(
-      const ncnn::Mat &inimage, ncnn::Mat &outimage,
+
+  const char* name() override;
+
+  liret process_image(
+      const ImageInfo &inimage, ImageInfo &outimage,
       const ProgressCallback &&procb = [](float val) { printf("%.2f\n", val); }) const override;
 
 public:
@@ -23,6 +30,9 @@ private:
   ncnn::Layer *bicubic_2x;
   ncnn::Layer *bicubic_3x;
   ncnn::Layer *bicubic_4x;
+
+  ncnn::Net *net;
+  bool tta_mode;
 };
 } // namespace limb
 #endif // _REALESRGAN_SERVICE_H_

@@ -7,52 +7,53 @@
 #include "amqp-handler/amqp-handler.hpp"
 #include "amqp-router/amqp-router.hpp"
 
-#include "ncnn-service/ncnn-service-realesrgan.h"
-
 #include "image-service/image-service.hpp"
 #include "mongo-client/mongo-client.hpp"
+#include "realesrgan/realesrgan-processor.h"
 
 #include "utils/bithacks.h"
+#include "utils/image-info.h"
 
 // TODO: create separate integrational testing pipeline
-// #define INTEGRATIONAL_TEST
+#define INTEGRATIONAL_TEST
 #ifdef INTEGRATIONAL_TEST
 #include "utils/stb-include.h"
 #include <functional>
 #include <future>
+
 int test_mp() {
   limb::tp::ThreadPool threadPool;
   int x, y, c;
   std::string ext = ".png";
   std::string fullinput = "";
   fullinput += "inmem";
-  unsigned char *pixeldataOne = stbi_load("inmem.png", &x, &y, &c, 0);
+  unsigned char *pixeldataOne = stbi_load((fullinput + ext).c_str(), &x, &y, &c, 0);
 
   int x1, y1, c1;
   unsigned char *pixeldataTwo = stbi_load((fullinput + ext).c_str(), &x1, &y1, &c1, 0);
 
-  limb::NcnnService *firstServ = nullptr;
-  auto ret = limb::imageService->imageProcessorNew((IP_IMAGE_REALESRGAN), &firstServ);
+  limb::ImageProcessor *firstServ = nullptr;
+  auto ret = limb::imageService->getProcessor(IP_IMAGE_REALESRGAN, &firstServ);
   if (ret != liret::kOk) {
     printf("first %s", listat::getErrorMessage(ret));
     return (int)ret;
   }
 
-  limb::NcnnService *secondServ = nullptr;
-  ret = limb::imageService->imageProcessorNew((IP_IMAGE_REALESRGAN), &secondServ);
+  limb::ImageProcessor *secondServ = nullptr;
+  ret = limb::imageService->getProcessor(IP_IMAGE_REALESRGAN, &secondServ);
   if (ret != liret::kOk) {
     printf("first %s", listat::getErrorMessage(ret));
     return (int)ret;
   }
 
-  ncnn::Mat inimageOne(x, y, (void *)pixeldataOne, (size_t)c, c);
-  ncnn::Mat outimageOne(x * 4, y * 4, (size_t)c, c);
+  limb::ImageInfo inimageOne = {.data = pixeldataOne, .w = (uint32_t)x, .h = (uint32_t)y, .c = (uint32_t)c};
+  limb::ImageInfo outimageOne;
 
-  ncnn::Mat inimageTwo(x1, y1, (void *)pixeldataTwo, (size_t)c1, c1);
-  ncnn::Mat outimageTwo(x1 * 4, y1 * 4, (size_t)c1, c1);
+  limb::ImageInfo inimageTwo = {.data = pixeldataTwo, .w = (uint32_t)x1, .h = (uint32_t)y1, .c = (uint32_t)c1};
+  limb::ImageInfo outimageTwo;
 
-  auto executionLambda = [](limb::NcnnService *ns, ncnn::Mat *inimage, ncnn::Mat *outimage) {
-    ns->process_matrix(*inimage, *outimage);
+  auto executionLambda = [](limb::ImageProcessor *ns, limb::ImageInfo *inimage, limb::ImageInfo *outimage) {
+    ns->process_image(*inimage, *outimage);
   };
 
   auto lamOne = [executionLambda, firstServ, &inimageOne, &outimageOne]() {
@@ -62,6 +63,7 @@ int test_mp() {
   auto lamTwo = [executionLambda, secondServ, &inimageTwo, &outimageTwo]() {
     executionLambda(secondServ, &inimageTwo, &outimageTwo);
   };
+
   std::packaged_task<void()> packOne(lamOne);
   std::packaged_task<void()> packTwo(lamTwo);
   std::future<void> futOne = packOne.get_future();
@@ -84,7 +86,7 @@ int main(int argc, char **argv) {
   ncnn::create_gpu_instance();
 
   bson_error_t error = {0};
-  const char *uri_string = "mongodb://192.168.31.79:8005/?appname=client-example";
+  const char *uri_string = "mongodb://192.168.88.245:8005/?appname=client-example";
   mongoc_uri_t *uri;
   uri = mongoc_uri_new_with_error(uri_string, &error);
 
@@ -119,7 +121,6 @@ int main(int argc, char **argv) {
   opts_realesrgan.prepadding = 10;
   opts_realesrgan.tta_mode = false;
   opts_realesrgan.vulkan_device_index = ncnn::get_default_gpu_index();
-  opts_realesrgan.type = IP_IMAGE_REALESRGAN;
 
   ncnn::Net net;
   net.opt.use_vulkan_compute = true;
@@ -139,16 +140,18 @@ int main(int argc, char **argv) {
             uri_string, error.message);
     return EXIT_FAILURE;
   }
-  opts_realesrgan.net = &net;
+
+  limb::RealesrganProcessor realesrgan(&net, false);
+  realesrgan.scale = 4;
+  realesrgan.tilesize = 200;
+  realesrgan.prepadding = 10;
+  realesrgan.load();
 
   // Initialise ImageSerice
   limb::imageService = new limb::ImageService;
-  err = limb::imageService->addOption(opts_realesrgan);
+  err = limb::imageService->addProcessor(IP_IMAGE_REALESRGAN, &realesrgan);
   if (err != liret::kOk) {
-    fprintf(stderr,
-            "failed to add option: %s\n"
-            "error message:  %s\n",
-            uri_string, error.message);
+    fprintf(stderr, "failed to add realesrgan processor\n");
   }
 
 // Tests

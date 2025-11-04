@@ -185,22 +185,24 @@ void AmqpHandler::AmqpHandler::close_handler() {
 
 // Should run async
 void AmqpHandler::heartbeater(AMQP::Connection *connection, uint16_t interval) {
-  std::chrono::high_resolution_clock::time_point lastSent = std::chrono::high_resolution_clock::now();
+  using clock = std::chrono::high_resolution_clock;
+
+  clock::time_point lastSent = clock::now();
   while (m_impl->quit == false) {
     std::this_thread::sleep_for(std::chrono::milliseconds(HEARTBEAT_RESOLUTION));
     if (connection == nullptr) {
       return;
     }
-    auto currentTime = std::chrono::high_resolution_clock::now();
+    auto currentTime = clock::now();
     std::chrono::duration<float> diff = currentTime - lastSent;
     // if time is up, then try to send heartbeat
     if (uint16_t(diff.count()) >= interval) {
-      auto const lasMessage = m_impl->lastMessage.load();
-      std::chrono::duration<float> writeDiff = currentTime - lasMessage;
+      auto const lastMessage = m_impl->lastMessage.load();
+      std::chrono::duration<float> writeDiff = currentTime - lastMessage;
 
       // If less than <interval> seconds have passed since the last message, then we skip
       if (uint16_t(writeDiff.count()) < interval) {
-        lastSent = lasMessage;
+        lastSent = lastMessage;
       } else {
         lastSent = currentTime;
         connection->heartbeat();

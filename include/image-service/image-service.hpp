@@ -1,21 +1,23 @@
 #ifndef _IMAGE_SERVICE_HPP_
 #define _IMAGE_SERVICE_HPP_
+#include "image-processor.h"
 #include "image-service/data-models.hpp"
-#include "image-service/image-processor-define.hpp"
-#include "ncnn-service/ncnn-service.h"
 #include "utils/status.h"
 
 #include <vector>
+
+typedef enum {
+  IP_IMAGE_NO = 0,
+  IP_IMAGE_REALESRGAN, ///< ncnn realesrgan
+} IMAGE_PROCESSOR_TYPES;
 
 namespace limb {
 class ImageService;
 struct ImageServiceOptions {
 private:
 public:
-  ncnn::Net *net;
   const char *paramfullpath;
   const char *modelfullpath;
-  IMAGE_PROCESSOR_TYPES type;
   int vulkan_device_index;
   int prepadding;
   int tilesize;
@@ -28,18 +30,16 @@ class ImageService {
 public:
   ~ImageService();
 
-  liret handleUpscaleImage(const MUpscaleImage &input, const ProgressCallback &&procb = [](float val) {});
-  // Alocates part of memory that shared between services with same type
-  // Also should free memory inside m_services
-  liret addOption(const ImageServiceOptions &opt);
+  liret processImage(const MUpscaleImage &input, const ProgressCallback &&procb = [](float val) {});
 
-  // Allocates new processos of specific type
-  liret imageProcessorNew(IMAGE_PROCESSOR_TYPES type, NcnnService **proc);
+  liret getProcessor(size_t index, ImageProcessor **processor);
 
-  void imageProcessorDestroy(NcnnService **recorder);
+  liret addProcessor(size_t index, ImageProcessor *proc);
+
+  bool removeProcessor(size_t index);
 
 private:
-  std::vector<ImageServiceOptions> m_services;
+  std::vector<ImageProcessor *> m_processors;
 };
 extern ImageService *imageService;
 } // namespace limb

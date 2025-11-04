@@ -1,4 +1,4 @@
-#include "ncnn-service/ncnn-service-realesrgan.h"
+#include "realesrgan/realesrgan-processor.h"
 
 #include <algorithm>
 
@@ -42,7 +42,11 @@ static const uint32_t realesrgan_postproc_tta_int8s_spv_data[] = {
 };
 
 namespace limb {
-RealesrganService::RealesrganService(ncnn::Net *net, bool _tta_mode) : NcnnService(net, _tta_mode) {
+RealesrganProcessor::RealesrganProcessor(ncnn::Net *_net, bool _tta_mode) {
+
+  net = _net;
+  tta_mode = _tta_mode;
+
   realesrgan_preproc = nullptr;
   realesrgan_postproc = nullptr;
 
@@ -50,7 +54,8 @@ RealesrganService::RealesrganService(ncnn::Net *net, bool _tta_mode) : NcnnServi
   bicubic_3x = nullptr;
   bicubic_4x = nullptr;
 }
-RealesrganService::~RealesrganService() {
+
+RealesrganProcessor::~RealesrganProcessor() {
   delete realesrgan_preproc;
   delete realesrgan_postproc;
 
@@ -67,7 +72,9 @@ RealesrganService::~RealesrganService() {
   delete bicubic_4x;
 }
 
-liret RealesrganService::load() {
+const char* RealesrganProcessor::name() { return "Real-ESRGAN"; }
+
+liret RealesrganProcessor::load() {
   int ret = 0;
 
   // initialize preprocess and postprocess pipeline
@@ -170,13 +177,21 @@ liret RealesrganService::load() {
   return liret::kOk;
 }
 
-liret RealesrganService::process_matrix(const ncnn::Mat &inimage, ncnn::Mat &outimage,
-                                        const ProgressCallback &&procb) const {
+liret RealesrganProcessor::process_image(const ImageInfo &inimage, ImageInfo &outimage,
+                                         const ProgressCallback &&procb) const {
+  // TODO: check does inmat is really nessesary
+  ncnn::Mat inmat(inimage.w, inimage.h, (void *)inimage.data, (size_t)inimage.c, inimage.c);
+
+  outimage.w = inimage.w * 4;
+  outimage.h = inimage.h * 4;
+  outimage.c = inimage.c;
+  outimage.data = new uint8_t[outimage.w * outimage.h * outimage.c];
+  //ncnn::Mat outmat(outimage.w, outimage.h, (void *)outimage.data, (size_t)outimage.c, outimage.c);
 
   const unsigned char *pixeldata = (const unsigned char *)inimage.data;
   const int w = inimage.w;
   const int h = inimage.h;
-  const int channels = inimage.elempack;
+  const int channels = inmat.elempack;
 
   const int TILE_SIZE_X = tilesize;
   const int TILE_SIZE_Y = tilesize;

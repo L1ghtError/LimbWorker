@@ -90,7 +90,7 @@ liret setRoutes(limb::tp::ThreadPool &tp, AMQP::Connection &conn, AMQP::Channel 
         ++iteration;
       };
 
-      liret ret = limb::imageService->handleUpscaleImage(pbody, progressCb);
+      liret ret = limb::imageService->processImage(pbody, progressCb);
       if (ret != liret::kOk) {
         printf("Err upscale %s\n", listat::getErrorMessage(ret));
       }
