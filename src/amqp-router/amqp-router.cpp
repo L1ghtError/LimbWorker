@@ -2,7 +2,6 @@
 
 #include "mongo-client/mongo-client.hpp"
 
-#include "image-service/data-models.hpp"
 #include "image-service/image-service.hpp"
 #include "utils/estimate.h"
 #include <future>

@@ -1,10 +1,11 @@
 #ifndef _IMAGE_SERVICE_HPP_
 #define _IMAGE_SERVICE_HPP_
 #include "image-processor.h"
-#include "image-service/data-models.hpp"
-#include "utils/status.h"
 
+#include <cstdint>
 #include <vector>
+
+#include "utils/status.h"
 
 typedef enum {
   IP_IMAGE_NO = 0,
@@ -12,6 +13,17 @@ typedef enum {
 } IMAGE_PROCESSOR_TYPES;
 
 namespace limb {
+struct MUpscaleImage {
+  uint32_t modelId;
+  uint8_t imageId[24];
+
+  liret berawtoh(const char *raw) {
+    *this = *(MUpscaleImage *)(raw);
+    modelId = be32toh(modelId);
+    return liret::kOk;
+  }
+};
+
 class ImageService;
 struct ImageServiceOptions {
 private:
