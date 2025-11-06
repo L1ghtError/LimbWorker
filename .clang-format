@@ -1,2 +1,3 @@
 UseTab: Never
+SortIncludes: true
 ColumnLimit: 120

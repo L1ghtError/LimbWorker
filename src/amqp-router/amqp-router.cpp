@@ -20,7 +20,8 @@ liret setRoutes(limb::tp::ThreadPool &tp, AMQP::Connection &conn, AMQP::Channel 
   // ping queue
   ch.declareQueue("ping_queue");
   ch.consume("").onReceived([&ch](const AMQP::Message &message, uint64_t deliveryTag, bool redelivered) {
-    std::cout << " [.] ping body(" << message.body() << ")" << " id:" << message.correlationID() << std::endl;
+    std::cout << " [.] ping body(" << message.body() << ")"
+              << " id:" << message.correlationID() << std::endl;
     char *recvMsg = (char *)malloc((28 + message.bodySize()) * sizeof(*message.body()));
     std::string msg = "Hello, I can works with you";
     AMQP::Envelope env(msg.c_str());

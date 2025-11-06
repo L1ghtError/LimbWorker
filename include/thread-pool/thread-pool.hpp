@@ -98,7 +98,7 @@ template <typename Task, template <typename> class Queue> inline ThreadPoolImpl<
     worker_ptr->stop();
   }
   handler_cv.notify_all();
-    for (auto &worker_ptr : m_workers) {
+  for (auto &worker_ptr : m_workers) {
     worker_ptr->join();
   }
 }

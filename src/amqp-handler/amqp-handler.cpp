@@ -48,7 +48,8 @@ private:
 struct AmqpHandlerImpl {
   AmqpHandlerImpl(const AmqpConfig *_conf = nullptr)
       : connected(false), connection(nullptr), quit(false), keepAlive(true), inputBuffer(AmqpHandler::BUFFER_SIZE),
-        outBuffer(AmqpHandler::BUFFER_SIZE), tmpBuff(AmqpHandler::TEMP_BUFFER_SIZE), sock(abnet::invalid_socket), conf(_conf) {
+        outBuffer(AmqpHandler::BUFFER_SIZE), tmpBuff(AmqpHandler::TEMP_BUFFER_SIZE), sock(abnet::invalid_socket),
+        conf(_conf) {
 
     if (conf == nullptr) {
       static const AmqpConfig defaultConf = {60};

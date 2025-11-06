@@ -41,8 +41,7 @@ liret ImageService::processImage(const MUpscaleImage &input, const ProgressCallb
   imgProc->process_image(inimage, outimage, ProgressCallback(procb));
   delete pixeldata;
   int outSize = 0;
-  uint8_t *outImage =
-      stbi_write_png_to_mem((uint8_t *)outimage.data, 0, outimage.w, outimage.h, outimage.c, &outSize);
+  uint8_t *outImage = stbi_write_png_to_mem((uint8_t *)outimage.data, 0, outimage.w, outimage.h, outimage.c, &outSize);
 
   ret = limb::mongoService->updateImageById(&imageId, outImage, outSize);
   if (ret != liret::kOk) {

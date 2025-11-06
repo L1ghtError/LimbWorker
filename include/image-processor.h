@@ -2,8 +2,8 @@
 #define _IMAGE_PROCESSOR_H_
 
 #include "utils/callbacks.h"
-#include "utils/status.h"
 #include "utils/image-info.h"
+#include "utils/status.h"
 
 #include <cstdio>
 #include <string>
@@ -17,7 +17,7 @@ public:
 
   virtual liret load() = 0;
 
-  virtual const char* name() = 0;
+  virtual const char *name() = 0;
   // TODO: Make Lambda Embty (caller passes desired logger)
   virtual liret process_image(
       const ImageInfo &inimage, ImageInfo &outimage,
