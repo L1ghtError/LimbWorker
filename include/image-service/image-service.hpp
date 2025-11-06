@@ -24,20 +24,6 @@ struct MUpscaleImage {
   }
 };
 
-class ImageService;
-struct ImageServiceOptions {
-private:
-public:
-  const char *paramfullpath;
-  const char *modelfullpath;
-  int vulkan_device_index;
-  int prepadding;
-  int tilesize;
-  int scale;
-  bool tta_mode;
-  friend ImageService;
-};
-
 class ImageService {
 public:
   ~ImageService();

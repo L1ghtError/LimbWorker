@@ -38,13 +38,34 @@ static const uint32_t realesrgan_postproc_tta_fp16s_spv_data[] = {
 #include "realesrgan_postproc_tta_fp16s.spv.hex.h"
 };
 static const uint32_t realesrgan_postproc_tta_int8s_spv_data[] = {
+#include "realesrgan-processor.h"
 #include "realesrgan_postproc_tta_int8s.spv.hex.h"
 };
 
 namespace limb {
+RealesrganProcessor::RealesrganProcessor() {
+
+  net = new ncnn::Net();
+  net_owner = true;
+  tta_mode = false;
+
+  realesrgan_preproc = nullptr;
+  realesrgan_postproc = nullptr;
+
+  bicubic_2x = nullptr;
+  bicubic_3x = nullptr;
+  bicubic_4x = nullptr;
+};
+
 RealesrganProcessor::RealesrganProcessor(ncnn::Net *_net, bool _tta_mode) {
 
-  net = _net;
+  if (!_net) {
+    _net = new ncnn::Net();
+    net_owner = true;
+  } else {
+    net_owner = false;
+  }
+
   tta_mode = _tta_mode;
 
   realesrgan_preproc = nullptr;
@@ -59,6 +80,9 @@ RealesrganProcessor::~RealesrganProcessor() {
   delete realesrgan_preproc;
   delete realesrgan_postproc;
 
+  if (net_owner)
+    delete net;
+
   if (bicubic_2x != nullptr)
     bicubic_2x->destroy_pipeline(net->opt);
   delete bicubic_2x;
@@ -72,7 +96,38 @@ RealesrganProcessor::~RealesrganProcessor() {
   delete bicubic_4x;
 }
 
-const char* RealesrganProcessor::name() { return "Real-ESRGAN"; }
+liret RealesrganProcessor::init() {
+  ncnn::create_gpu_instance();
+
+  scale = 4;
+  tilesize = 200;
+  prepadding = 10;
+
+  net->opt.use_vulkan_compute = true;
+  net->opt.use_fp16_packed = true;
+  net->opt.use_fp16_storage = true;
+  net->opt.use_fp16_arithmetic = false;
+  net->opt.use_int8_storage = true;
+  net->opt.use_int8_arithmetic = false;
+  net->set_vulkan_device(ncnn::get_default_gpu_index());
+
+  const char *paramfullpath = "../models/realesrgan-x4plus.param";
+  const char *modelfullpath = "../models/realesrgan-x4plus.bin";
+
+  if (net->load_param(paramfullpath) != 0) {
+    fprintf(stderr, "failed to load param: %s\n", paramfullpath);
+    return liret::kAborted;
+  }
+
+  if (net->load_model(modelfullpath) != 0) {
+    fprintf(stderr, "failed to load model: %s\n", modelfullpath);
+    return liret::kAborted;
+  }
+
+  return liret::kOk;
+}
+
+const char *RealesrganProcessor::name() { return "Real-ESRGAN"; }
 
 liret RealesrganProcessor::load() {
   int ret = 0;
@@ -186,7 +241,7 @@ liret RealesrganProcessor::process_image(const ImageInfo &inimage, ImageInfo &ou
   outimage.h = inimage.h * 4;
   outimage.c = inimage.c;
   outimage.data = new uint8_t[outimage.w * outimage.h * outimage.c];
-  //ncnn::Mat outmat(outimage.w, outimage.h, (void *)outimage.data, (size_t)outimage.c, outimage.c);
+  // ncnn::Mat outmat(outimage.w, outimage.h, (void *)outimage.data, (size_t)outimage.c, outimage.c);
 
   const unsigned char *pixeldata = (const unsigned char *)inimage.data;
   const int w = inimage.w;
@@ -545,3 +600,7 @@ liret RealesrganProcessor::process_image(const ImageInfo &inimage, ImageInfo &ou
 }
 
 } // namespace limb
+
+extern "C" limb::RealesrganProcessor *createProcessor() { return new limb::RealesrganProcessor; }
+
+extern "C" void destroyProcessor(limb::ImageProcessor *processor) { delete processor; }

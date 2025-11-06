@@ -13,6 +13,8 @@ class ImageProcessor {
 public:
   virtual ~ImageProcessor() = default;
 
+  virtual liret init() = 0;
+
   virtual liret load() = 0;
 
   virtual const char* name() = 0;

@@ -3,13 +3,14 @@
 #include <thread>
 
 #include <amqpcpp.h>
+#include <dlfcn.h>
+#include <gpu.h>
 
 #include "amqp-handler/amqp-handler.hpp"
 #include "amqp-router/amqp-router.hpp"
 
 #include "image-service/image-service.hpp"
 #include "mongo-client/mongo-client.hpp"
-#include "realesrgan/realesrgan-processor.h"
 
 #include "utils/bithacks.h"
 #include "utils/image-info.h"
@@ -82,8 +83,9 @@ int test_mp() {
 }
 #endif
 int main(int argc, char **argv) {
+  liret err = liret::kOk;
+#ifndef INTEGRATIONAL_TEST
   mongoc_init();
-  ncnn::create_gpu_instance();
 
   bson_error_t error = {0};
   const char *uri_string = "mongodb://192.168.88.245:8005/?appname=client-example";
@@ -104,7 +106,7 @@ int main(int argc, char **argv) {
   }
 
   limb::mongoService = new limb::MongoService("LimbDB", pool);
-  liret err = limb::mongoService->ping(&error);
+  err = limb::mongoService->ping(&error);
   if (err != liret::kOk) {
     fprintf(stderr,
             "failed to ping: %s\n"
@@ -112,52 +114,47 @@ int main(int argc, char **argv) {
             uri_string, error.message);
     return EXIT_FAILURE;
   }
-  // initialise opts_realesrgan
-  limb::ImageServiceOptions opts_realesrgan;
-  opts_realesrgan.paramfullpath = "../models/realesrgan-x4plus.param";
-  opts_realesrgan.modelfullpath = "../models/realesrgan-x4plus.bin";
-  opts_realesrgan.scale = 4;
-  opts_realesrgan.tilesize = 200;
-  opts_realesrgan.prepadding = 10;
-  opts_realesrgan.tta_mode = false;
-  opts_realesrgan.vulkan_device_index = ncnn::get_default_gpu_index();
+#endif
 
-  ncnn::Net net;
-  net.opt.use_vulkan_compute = true;
-  net.opt.use_fp16_packed = true;
-  net.opt.use_fp16_storage = true;
-  net.opt.use_fp16_arithmetic = false;
-  net.opt.use_int8_storage = true;
-  net.opt.use_int8_arithmetic = false;
-  net.set_vulkan_device(opts_realesrgan.vulkan_device_index);
+  // Initialise ImageService
+  limb::imageService = new limb::ImageService;
 
-  int nerr = net.load_param(opts_realesrgan.paramfullpath);
-  nerr |= net.load_model(opts_realesrgan.modelfullpath);
-  if (nerr != 0) {
-    fprintf(stderr,
-            "failed to load net: %s\n"
-            "error message:  %s\n",
-            uri_string, error.message);
+  limb::ImageProcessor *realesrgan_ptr = nullptr;
+  const char *libpath = "./processors/realesrgan/librealesrgan.so";
+  void *handle = dlopen(libpath, RTLD_NOW | RTLD_LOCAL);
+  typedef limb::ImageProcessor *(*create_fn_t)();
+  typedef void (*destroy_fn_t)(limb::ImageProcessor *);
+  create_fn_t create_fn = nullptr;
+  destroy_fn_t destroy_fn = nullptr;
+  if (handle) {
+
+    create_fn = reinterpret_cast<create_fn_t>(dlsym(handle, "createProcessor"));
+    destroy_fn = reinterpret_cast<destroy_fn_t>(dlsym(handle, "destroyProcessor"));
+    if (create_fn && destroy_fn) {
+      realesrgan_ptr = create_fn();
+    }
+  } else {
+    fprintf(stderr, "warning: failed to open shared library '%s': %s\n", libpath, dlerror());
     return EXIT_FAILURE;
   }
 
-  limb::RealesrganProcessor realesrgan(&net, false);
-  realesrgan.scale = 4;
-  realesrgan.tilesize = 200;
-  realesrgan.prepadding = 10;
-  realesrgan.load();
-
-  // Initialise ImageSerice
-  limb::imageService = new limb::ImageService;
-  err = limb::imageService->addProcessor(IP_IMAGE_REALESRGAN, &realesrgan);
+  realesrgan_ptr->init();
+  realesrgan_ptr->load();
+  err = limb::imageService->addProcessor(IP_IMAGE_REALESRGAN, reinterpret_cast<limb::ImageProcessor *>(realesrgan_ptr));
   if (err != liret::kOk) {
     fprintf(stderr, "failed to add realesrgan processor\n");
   }
 
 // Tests
 #ifdef INTEGRATIONAL_TEST
-  return test_mp();
+  int test_ret = test_mp();
+  destroy_fn(realesrgan_ptr);
+  dlclose(handle);
+  if (ncnn::get_gpu_instance)
+    ncnn::destroy_gpu_instance();
+  return test_ret;
 #endif
+
   // AMQP preprocess
   AmqpConfig amqpConf;
   amqpConf.heartbeat = 60;
@@ -191,15 +188,20 @@ int main(int argc, char **argv) {
 
   handler.loop();
   // thd.join();
-
+#ifndef INTEGRATIONAL_TEST
   // TODO: Implement better cleanup
   delete limb::mongoService;
   mongoc_uri_destroy(uri);
   mongoc_client_pool_destroy(pool);
   mongoc_cleanup();
+#endif
 
   delete limb::imageService;
-  ncnn::destroy_gpu_instance();
+
+  destroy_fn(realesrgan_ptr);
+  dlclose(handle);
+  if (ncnn::get_gpu_instance)
+    ncnn::destroy_gpu_instance();
 
   return 0;
 }

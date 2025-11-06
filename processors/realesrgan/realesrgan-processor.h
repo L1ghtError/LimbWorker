@@ -9,11 +9,15 @@
 namespace limb {
 class RealesrganProcessor : public ImageProcessor {
 public:
+  RealesrganProcessor();
   RealesrganProcessor(ncnn::Net *net, bool tta_mode = false);
   ~RealesrganProcessor();
+
+  virtual liret init() override;
+
   liret load() override;
 
-  const char* name() override;
+  const char *name() override;
 
   liret process_image(
       const ImageInfo &inimage, ImageInfo &outimage,
@@ -32,7 +36,13 @@ private:
   ncnn::Layer *bicubic_4x;
 
   ncnn::Net *net;
+  bool net_owner;
   bool tta_mode;
 };
 } // namespace limb
+
+extern "C" limb::RealesrganProcessor *createProcessor();
+
+extern "C" void destroyProcessor(limb::ImageProcessor *processor);
+
 #endif // _REALESRGAN_SERVICE_H_

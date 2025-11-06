@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.5)
+cmake_minimum_required(VERSION 3.15)
 set(CMAKE_CXX_STANDARD 20)
 project (LimbMediaService VERSION 1.0 LANGUAGES C CXX)
 #finds
@@ -82,16 +82,6 @@ set(GTEST_ROOTDIR "Dependencies/googletest")
 set(ABSOLUTE_NCNN_ROOTDIR "${CMAKE_CURRENT_SOURCE_DIR}/${NCNN_ROOTDIR}")
 set(ABSOLUTE_AMQP_CPP_ROOTDIR "${CMAKE_CURRENT_SOURCE_DIR}/${AMQP_CPP_ROOTDIR}")
 set(ABSOLUTE_GTEST_ROOTDIR "${CMAKE_CURRENT_SOURCE_DIR}/${GTEST_ROOTDIR}")
-#includes
-include_directories("include")
-include_directories("processors")
-include_directories("${CMAKE_CURRENT_BINARY_DIR}")
-include_directories("Dependencies/AMQP-CPP/include")
-include_directories("Dependencies/abnet/include")
-
-#libs
-link_directories("Dependencies/AMQP-CPP/build-debug/bin/")
-link_directories("Dependencies/AMQP-CPP/build-release/bin/")
 
 # Link MONGO-C-DRIVER
 if(USE_SYSTEM_MONGO_C_DRIVER)
@@ -235,17 +225,19 @@ if(NOT USE_SYSTEM_NCNN)
     add_subdirectory("${NCNN_ROOTDIR}")
 endif()
 
-#compile shaders
-set(SHADER_SPV_HEX_FILES)
-set(REALESRGAN_SOURCES_PATH "shaders")
-compile_shader("${REALESRGAN_SOURCES_PATH}/realesrgan_preproc.comp")
-compile_shader("${REALESRGAN_SOURCES_PATH}/realesrgan_postproc.comp")
-compile_shader("${REALESRGAN_SOURCES_PATH}/realesrgan_preproc_tta.comp")
-compile_shader("${REALESRGAN_SOURCES_PATH}/realesrgan_postproc_tta.comp")
-add_custom_target(generate-spirv DEPENDS ${SHADER_SPV_HEX_FILES})
-# Libs
 add_library(lib_dependencies INTERFACE)
+#includes
+target_include_directories(lib_dependencies INTERFACE "include")
+target_include_directories(lib_dependencies INTERFACE "${CMAKE_CURRENT_BINARY_DIR}")
+target_include_directories(lib_dependencies INTERFACE "Dependencies/AMQP-CPP/include")
+target_include_directories(lib_dependencies INTERFACE "Dependencies/abnet/include")
+
+# Libs
+target_link_directories(lib_dependencies INTERFACE "Dependencies/AMQP-CPP/build-debug/bin/")
+target_link_directories(lib_dependencies INTERFACE "Dependencies/AMQP-CPP/build-release/bin/")
+
 target_link_libraries(lib_dependencies INTERFACE ncnn amqpcpp mongo::mongoc_static Threads::Threads)
+
 # Tests
 if (ENABLE_TESTS)
     if (NOT EXISTS "${ABSOLUTE_GTEST_ROOTDIR}/CMakeLists.txt")
@@ -259,8 +251,9 @@ if (ENABLE_TESTS)
 endif()
 # Add sources
 file(GLOB_RECURSE SOURCES RELATIVE ${CMAKE_SOURCE_DIR} "src/*")
-file(GLOB_RECURSE MODULE_SOURCES RELATIVE ${CMAKE_SOURCE_DIR} "processors/*")
-add_executable(service  ${SOURCES} ${MODULE_SOURCES})
-add_dependencies(service generate-spirv)
+add_executable(service  ${SOURCES})
 # Link libraries
 target_link_libraries(service PRIVATE lib_dependencies)
+
+# Configure processor plugins
+add_subdirectory("processors")
