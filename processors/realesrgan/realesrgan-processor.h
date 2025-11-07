@@ -45,4 +45,6 @@ extern "C" limb::RealesrganProcessor *createProcessor();
 
 extern "C" void destroyProcessor(limb::ImageProcessor *processor);
 
+extern "C" const char *processorName();
+
 #endif // _REALESRGAN_SERVICE_H_

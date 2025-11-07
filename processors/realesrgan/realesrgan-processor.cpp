@@ -42,6 +42,12 @@ static const uint32_t realesrgan_postproc_tta_int8s_spv_data[] = {
 #include "realesrgan_postproc_tta_int8s.spv.hex.h"
 };
 
+extern "C" limb::RealesrganProcessor *createProcessor() { return new limb::RealesrganProcessor; }
+
+extern "C" void destroyProcessor(limb::ImageProcessor *processor) { delete processor; }
+
+extern "C" const char *processorName() { return "Real-ESRGAN"; }
+
 namespace limb {
 RealesrganProcessor::RealesrganProcessor() {
 
@@ -127,7 +133,7 @@ liret RealesrganProcessor::init() {
   return liret::kOk;
 }
 
-const char *RealesrganProcessor::name() { return "Real-ESRGAN"; }
+const char *RealesrganProcessor::name() { return processorName(); }
 
 liret RealesrganProcessor::load() {
   int ret = 0;
@@ -600,7 +606,3 @@ liret RealesrganProcessor::process_image(const ImageInfo &inimage, ImageInfo &ou
 }
 
 } // namespace limb
-
-extern "C" limb::RealesrganProcessor *createProcessor() { return new limb::RealesrganProcessor; }
-
-extern "C" void destroyProcessor(limb::ImageProcessor *processor) { delete processor; }

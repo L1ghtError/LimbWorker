@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
+set(CMAKE_CXX_STANDARD 20)
 
 get_filename_component(PLUGIN_NAME ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 
