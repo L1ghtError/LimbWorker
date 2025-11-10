@@ -15,7 +15,7 @@ compile_shader("${REALESRGAN_SOURCES_PATH}/realesrgan_postproc_tta.comp")
 
 add_custom_target(${PLUGIN_NAME}-generate-spirv DEPENDS ${SHADER_SPV_HEX_FILES})
 
-add_library(${PLUGIN_NAME} SHARED ${SRC_FILES})
+add_library(${PLUGIN_NAME} MODULE ${SRC_FILES})
 
 target_include_directories(${PLUGIN_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/processors
@@ -25,5 +25,7 @@ target_include_directories(${PLUGIN_NAME} PRIVATE
 target_link_libraries(${PLUGIN_NAME} PRIVATE ncnn)
 
 add_dependencies(${PLUGIN_NAME} ${PLUGIN_NAME}-generate-spirv)
+
+target_compile_definitions(${PLUGIN_NAME} PRIVATE REALESRGAN_EXPORTS)
 
 message(STATUS "Built plugin: ${PLUGIN_NAME}")

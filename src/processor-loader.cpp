@@ -1,10 +1,55 @@
 #include "processor-loader.h"
 
 #include <algorithm>
-#include <dlfcn.h>
 #include <filesystem>
 #include <mutex>
+#include <string_view>
 #include <unordered_map>
+
+#ifdef _WIN32
+#include <windows.h>
+typedef HMODULE LibHandle;
+#else
+#include <dlfcn.h>
+typedef void *LibHandle;
+#endif
+
+LibHandle loadLibrary(const char *path) {
+#ifdef _WIN32
+  HMODULE handle = LoadLibraryA(path);
+#else
+  void *handle = dlopen(path, RTLD_NOW | RTLD_LOCAL);
+
+#endif
+  return handle;
+}
+
+void unloadLibrary(LibHandle handle) {
+#ifdef _WIN32
+  if (handle)
+    FreeLibrary(handle);
+#else
+  if (handle)
+    dlclose(handle);
+#endif
+}
+
+const char libEXT[] =
+#ifdef _WIN32
+    ".dll";
+#elif __APPLE__
+    ".dylib";
+#else
+    ".so";
+#endif
+
+void *getFunction(LibHandle handle, const char *name) {
+#ifdef _WIN32
+  return reinterpret_cast<void *>(GetProcAddress(handle, name));
+#else
+  return dlsym(handle, name);
+#endif
+}
 
 namespace limb {
 
@@ -15,7 +60,7 @@ typedef void (*destroy_fn_t)(limb::ImageProcessor *);
 typedef const char *(*name_fn_t)();
 
 struct ProcessorModule {
-  void *m_handle;
+  LibHandle m_handle;
   create_fn_t create_fn;
   destroy_fn_t destroy_fn;
   name_fn_t name_fn;
@@ -116,31 +161,29 @@ public:
   size_t dirCount() { return m_loadDirectories.size() + 1; }
 
   void loadModules(const fs::path &directory) {
-    constexpr char fileExtantion[] = ".so";
-
     if (!fs::is_directory(directory)) {
       return;
     }
 
     for (const auto &file : fs::directory_iterator(directory)) {
       std::string filename = file.path().filename().string();
-      if (!file.is_regular_file() || filename.find(fileExtantion) == std::string::npos)
+      if (!file.is_regular_file() || filename.find(libEXT) == std::string::npos)
         continue;
 
-      std::string fullPath = file.path().c_str();
-      void *handle = dlopen(fullPath.c_str(), RTLD_NOW | RTLD_LOCAL);
+      std::string fullPath = fs::absolute(file.path()).string();
+      LibHandle handle = loadLibrary(fullPath.c_str());
 
       // TODO: consider display a warning
       if (!handle)
         continue;
 
-      create_fn_t create_fn = reinterpret_cast<create_fn_t>(dlsym(handle, "createProcessor"));
-      destroy_fn_t destroy_fn = reinterpret_cast<destroy_fn_t>(dlsym(handle, "destroyProcessor"));
-      name_fn_t name_fn = reinterpret_cast<name_fn_t>(dlsym(handle, "processorName"));
+      create_fn_t create_fn = reinterpret_cast<create_fn_t>(getFunction(handle, "createProcessor"));
+      destroy_fn_t destroy_fn = reinterpret_cast<destroy_fn_t>(getFunction(handle, "destroyProcessor"));
+      name_fn_t name_fn = reinterpret_cast<name_fn_t>(getFunction(handle, "processorName"));
 
       // TODO: consider display a warning
       if (!create_fn || !destroy_fn || !name_fn) {
-        dlclose(handle);
+        unloadLibrary(handle);
         continue;
       }
 
@@ -169,7 +212,7 @@ public:
 
     for (const auto &module : m_modules) {
       if (module.m_handle) {
-        dlclose(module.m_handle);
+        unloadLibrary(module.m_handle);
       }
     }
     m_modules.clear();

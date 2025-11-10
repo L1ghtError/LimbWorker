@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "utils/endian.h"
 #include "utils/status.h"
 
 typedef enum {
@@ -28,8 +29,7 @@ class ImageService {
 public:
   ~ImageService();
 
-  liret processImage(
-      const MUpscaleImage &input, const ProgressCallback &&procb = [](float val) {});
+  liret processImage(const MUpscaleImage &input, const ProgressCallback &&procb = [](float val) {});
 
   liret getProcessor(size_t index, ImageProcessor **processor);
 

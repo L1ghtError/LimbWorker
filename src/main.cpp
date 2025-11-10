@@ -3,7 +3,6 @@
 #include <thread>
 
 #include <amqpcpp.h>
-#include <dlfcn.h>
 #include <gpu.h>
 
 #include "amqp-handler/amqp-handler.hpp"
@@ -48,10 +47,10 @@ int test_mp() {
     return (int)ret;
   }
 
-  limb::ImageInfo inimageOne = {.data = pixeldataOne, .w = (uint32_t)x, .h = (uint32_t)y, .c = (uint32_t)c};
+  limb::ImageInfo inimageOne = {.data = pixeldataOne, .w = x, .h = y, .c = c};
   limb::ImageInfo outimageOne;
 
-  limb::ImageInfo inimageTwo = {.data = pixeldataTwo, .w = (uint32_t)x1, .h = (uint32_t)y1, .c = (uint32_t)c1};
+  limb::ImageInfo inimageTwo = {.data = pixeldataTwo, .w = x1, .h = y1, .c = c1};
   limb::ImageInfo outimageTwo;
 
   auto executionLambda = [](limb::ImageProcessor *ns, limb::ImageInfo *inimage, limb::ImageInfo *outimage) {
@@ -182,7 +181,7 @@ int main(int argc, char **argv) {
 #endif
 
   delete limb::imageService;
-  if (ncnn::get_gpu_instance)
+  if (ncnn::get_gpu_instance())
     ncnn::destroy_gpu_instance();
 
   return 0;

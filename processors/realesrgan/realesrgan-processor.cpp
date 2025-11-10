@@ -42,45 +42,21 @@ static const uint32_t realesrgan_postproc_tta_int8s_spv_data[] = {
 #include "realesrgan_postproc_tta_int8s.spv.hex.h"
 };
 
-extern "C" limb::RealesrganProcessor *createProcessor() { return new limb::RealesrganProcessor; }
+extern "C" LIMB_API limb::RealesrganProcessor *createProcessor() { return new limb::RealesrganProcessor; }
 
-extern "C" void destroyProcessor(limb::ImageProcessor *processor) { delete processor; }
+extern "C" LIMB_API void destroyProcessor(limb::ImageProcessor *processor) { delete processor; }
 
-extern "C" const char *processorName() { return "Real-ESRGAN"; }
+extern "C" LIMB_API const char *processorName() { return "Real-ESRGAN"; }
 
 namespace limb {
-RealesrganProcessor::RealesrganProcessor() {
+RealesrganProcessor::RealesrganProcessor()
+    : net(new ncnn::Net()), net_owner(true), tta_mode(false), realesrgan_preproc(nullptr), realesrgan_postproc(nullptr),
+      bicubic_2x(nullptr), bicubic_3x(nullptr), bicubic_4x(nullptr), scale(0), tilesize(0), prepadding(0) {};
 
-  net = new ncnn::Net();
-  net_owner = true;
-  tta_mode = false;
-
-  realesrgan_preproc = nullptr;
-  realesrgan_postproc = nullptr;
-
-  bicubic_2x = nullptr;
-  bicubic_3x = nullptr;
-  bicubic_4x = nullptr;
-};
-
-RealesrganProcessor::RealesrganProcessor(ncnn::Net *_net, bool _tta_mode) {
-
-  if (!_net) {
-    _net = new ncnn::Net();
-    net_owner = true;
-  } else {
-    net_owner = false;
-  }
-
-  tta_mode = _tta_mode;
-
-  realesrgan_preproc = nullptr;
-  realesrgan_postproc = nullptr;
-
-  bicubic_2x = nullptr;
-  bicubic_3x = nullptr;
-  bicubic_4x = nullptr;
-}
+RealesrganProcessor::RealesrganProcessor(ncnn::Net *_net, bool _tta_mode)
+    : net(_net ? _net : new ncnn::Net()), net_owner(_net ? false : true), tta_mode(_tta_mode),
+      realesrgan_preproc(nullptr), realesrgan_postproc(nullptr), bicubic_2x(nullptr), bicubic_3x(nullptr),
+      bicubic_4x(nullptr), scale(0), tilesize(0), prepadding(0) {}
 
 RealesrganProcessor::~RealesrganProcessor() {
   delete realesrgan_preproc;

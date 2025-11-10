@@ -8,9 +8,9 @@ namespace limb {
 struct ImageInfo {
   uint8_t *data;
   size_t size;
-  uint32_t w;
-  uint32_t h;
-  uint32_t c;
+  int w;
+  int h;
+  int c;
 };
 
 inline void destroy_image_info(ImageInfo &ii) {

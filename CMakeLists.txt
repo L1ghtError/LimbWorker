@@ -1,14 +1,14 @@
 cmake_minimum_required(VERSION 3.15)
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 project (LimbMediaService VERSION 1.0 LANGUAGES C CXX)
-#finds
 
 # Threads
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 # Vulkan
 find_package(Vulkan REQUIRED)
-#macros
+# Macros
 find_program(GLSLANGVALIDATOR_EXECUTABLE NAMES glslangValidator PATHS $ENV{VULKAN_SDK}/bin NO_CMAKE_FIND_ROOT_PATH)
 message(STATUS "Found glslangValidator: ${GLSLANGVALIDATOR_EXECUTABLE}")
 
@@ -59,16 +59,16 @@ macro(compile_shader SHADER_SRC)
     list(APPEND SHADER_SPV_HEX_FILES ${SHADER_int8s_SPV_HEX_FILE})
 endmacro()
 
-#flags
+# Flags
 add_definitions(-DNOMINMAX)
-#options
+# Options
 option(USE_SYSTEM_NCNN "build with system libncnn" OFF)
 option(USE_SYSTEM_AMQP_CPP "build with system AMQP-CPP" OFF)
 option(USE_SYSTEM_MONGO_C_DRIVER "build with system mongoc" ON) # only optoin for now
 
 option(ENABLE_TESTS "build with tests" ON)
 
-# build type used in path determination
+# Build type used in path determination
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(BUILD_ROUTE "debug")
 else()
@@ -226,7 +226,7 @@ if(NOT USE_SYSTEM_NCNN)
 endif()
 
 add_library(lib_dependencies INTERFACE)
-#includes
+# Includes
 target_include_directories(lib_dependencies INTERFACE "include")
 target_include_directories(lib_dependencies INTERFACE "${CMAKE_CURRENT_BINARY_DIR}")
 target_include_directories(lib_dependencies INTERFACE "Dependencies/AMQP-CPP/include")
@@ -251,7 +251,7 @@ if (ENABLE_TESTS)
 endif()
 # Add sources
 file(GLOB_RECURSE SOURCES RELATIVE ${CMAKE_SOURCE_DIR} "src/*")
-add_executable(service  ${SOURCES})
+add_executable(service ${SOURCES})
 # Link libraries
 target_link_libraries(service PRIVATE lib_dependencies)
 
