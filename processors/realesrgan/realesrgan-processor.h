@@ -1,13 +1,23 @@
-#ifndef _REALESRGAN_SERVICE_H_
-#define _REALESRGAN_SERVICE_H_
+#ifndef _REALESRGAN_PROCESSOR_H_
+#define _REALESRGAN_PROCESSOR_H_
 #include "image-processor.h"
 
 #include <gpu.h>
 #include <layer.h>
 #include <net.h>
 
+#ifdef _WIN32
+#ifdef REALESRGAN_EXPORTS
+#define LIMB_API __declspec(dllexport)
+#else
+#define LIMB_API __declspec(dllimport)
+#endif
+#else
+#define LIMB_API
+#endif
+
 namespace limb {
-class RealesrganProcessor : public ImageProcessor {
+class LIMB_API RealesrganProcessor : public ImageProcessor {
 public:
   RealesrganProcessor();
   RealesrganProcessor(ncnn::Net *net, bool tta_mode = false);
@@ -41,8 +51,10 @@ private:
 };
 } // namespace limb
 
-extern "C" limb::RealesrganProcessor *createProcessor();
+extern "C" LIMB_API limb::RealesrganProcessor *createProcessor();
 
-extern "C" void destroyProcessor(limb::ImageProcessor *processor);
+extern "C" LIMB_API void destroyProcessor(limb::ImageProcessor *processor);
 
-#endif // _REALESRGAN_SERVICE_H_
+extern "C" LIMB_API const char *processorName();
+
+#endif // _REALESRGAN_PROCESSOR_H_

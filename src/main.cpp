@@ -3,7 +3,6 @@
 #include <thread>
 
 #include <amqpcpp.h>
-#include <dlfcn.h>
 #include <gpu.h>
 
 #include "amqp-handler/amqp-handler.hpp"
@@ -11,6 +10,7 @@
 
 #include "image-service/image-service.hpp"
 #include "mongo-client/mongo-client.hpp"
+#include "processor-loader.h"
 
 #include "utils/bithacks.h"
 #include "utils/image-info.h"
@@ -47,10 +47,10 @@ int test_mp() {
     return (int)ret;
   }
 
-  limb::ImageInfo inimageOne = {.data = pixeldataOne, .w = (uint32_t)x, .h = (uint32_t)y, .c = (uint32_t)c};
+  limb::ImageInfo inimageOne = {.data = pixeldataOne, .w = x, .h = y, .c = c};
   limb::ImageInfo outimageOne;
 
-  limb::ImageInfo inimageTwo = {.data = pixeldataTwo, .w = (uint32_t)x1, .h = (uint32_t)y1, .c = (uint32_t)c1};
+  limb::ImageInfo inimageTwo = {.data = pixeldataTwo, .w = x1, .h = y1, .c = c1};
   limb::ImageInfo outimageTwo;
 
   auto executionLambda = [](limb::ImageProcessor *ns, limb::ImageInfo *inimage, limb::ImageInfo *outimage) {
@@ -115,29 +115,14 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
 #endif
-
   // Initialise ImageService
   limb::imageService = new limb::ImageService;
 
-  limb::ImageProcessor *realesrgan_ptr = nullptr;
-  const char *libpath = "./processors/realesrgan/librealesrgan.so";
-  void *handle = dlopen(libpath, RTLD_NOW | RTLD_LOCAL);
-  typedef limb::ImageProcessor *(*create_fn_t)();
-  typedef void (*destroy_fn_t)(limb::ImageProcessor *);
-  create_fn_t create_fn = nullptr;
-  destroy_fn_t destroy_fn = nullptr;
-  if (handle) {
+  limb::ProcessorLoader loader({"processors"});
+  size_t count = loader.processorCount();
+  std::string procName = loader.processorName(0);
 
-    create_fn = reinterpret_cast<create_fn_t>(dlsym(handle, "createProcessor"));
-    destroy_fn = reinterpret_cast<destroy_fn_t>(dlsym(handle, "destroyProcessor"));
-    if (create_fn && destroy_fn) {
-      realesrgan_ptr = create_fn();
-    }
-  } else {
-    fprintf(stderr, "warning: failed to open shared library '%s': %s\n", libpath, dlerror());
-    return EXIT_FAILURE;
-  }
-
+  limb::ImageProcessor *realesrgan_ptr = loader.allocateProcessor(0);
   realesrgan_ptr->init();
   realesrgan_ptr->load();
   err = limb::imageService->addProcessor(IP_IMAGE_REALESRGAN, reinterpret_cast<limb::ImageProcessor *>(realesrgan_ptr));
@@ -148,8 +133,7 @@ int main(int argc, char **argv) {
 // Tests
 #ifdef INTEGRATIONAL_TEST
   int test_ret = test_mp();
-  destroy_fn(realesrgan_ptr);
-  dlclose(handle);
+
   if (ncnn::get_gpu_instance)
     ncnn::destroy_gpu_instance();
   return test_ret;
@@ -197,10 +181,7 @@ int main(int argc, char **argv) {
 #endif
 
   delete limb::imageService;
-
-  destroy_fn(realesrgan_ptr);
-  dlclose(handle);
-  if (ncnn::get_gpu_instance)
+  if (ncnn::get_gpu_instance())
     ncnn::destroy_gpu_instance();
 
   return 0;
