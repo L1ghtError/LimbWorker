@@ -1,7 +1,5 @@
 #include "amqp-router/amqp-router.hpp"
 
-#include "mongo-client/mongo-client.hpp"
-
 #include "image-service/image-service.hpp"
 #include "utils/estimate.h"
 #include <future>

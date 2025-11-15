@@ -141,7 +141,8 @@ void AmqpHandler::loop() {
       if (m_impl->tmpBuff.size() < bytesAvailable) {
         m_impl->tmpBuff.resize(bytesAvailable, 0);
       }
-      size_t bytesRead = abnet::socket_ops::recv1(m_impl->sock, &m_impl->tmpBuff[0], bytesAvailable, 0, ec);
+      abnet::signed_size_type bytesRead =
+          abnet::socket_ops::recv1(m_impl->sock, &m_impl->tmpBuff[0], bytesAvailable, 0, ec);
       if (bytesRead > bytesAvailable || bytesRead <= 0) {
         printf("Recv error: %s\n", ec.message().c_str());
         break;
@@ -159,7 +160,7 @@ void AmqpHandler::loop() {
         m_impl->inputBuffer.shl(count);
       }
     }
-    // sendDataFromBuffer();
+    sendDataFromBuffer();
   }
 
   if (m_impl->quit == 0) {

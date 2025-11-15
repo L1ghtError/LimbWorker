@@ -3,10 +3,13 @@
 #include "image-processor.h"
 
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 #include "utils/endian.h"
 #include "utils/status.h"
+
+#include "media-repository/media-repository.hpp"
 
 typedef enum {
   IP_IMAGE_NO = 0,
@@ -27,6 +30,8 @@ struct MUpscaleImage {
 
 class ImageService {
 public:
+  ImageService(std::unique_ptr<MediaRepository> mediaRepo);
+
   ~ImageService();
 
   liret processImage(const MUpscaleImage &input, const ProgressCallback &&procb = [](float val) {});
@@ -39,7 +44,9 @@ public:
 
 private:
   std::vector<ImageProcessor *> m_processors;
+  std::unique_ptr<MediaRepository> m_mediaRepo;
 };
+
 extern ImageService *imageService;
 } // namespace limb
 

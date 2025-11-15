@@ -1,26 +1,74 @@
-#include "mongo-client/mongo-client.hpp"
+#include "media-repository/mongo-client.hpp"
 
-#include <mongoc/mongoc.h>
 #include <stdio.h>
 #include <stdlib.h>
 
+#define MONGO_TRANSFER_CHUNK 4096
+#define MONGO_TIMEOUT_MS 5000
+
 namespace limb {
-MongoService *mongoService = nullptr;
+  class MongoInitializer {
+  public:
+    MongoInitializer() noexcept { mongoc_init(); }
+    ~MongoInitializer() noexcept { mongoc_cleanup(); }
 
-MongoService::MongoService(const char *_dbname, mongoc_client_pool_t *_cpool) : dbname(_dbname), cpool(_cpool) {}
+    MongoInitializer(const MongoInitializer &) = delete;
+    MongoInitializer &operator=(const MongoInitializer &) = delete;
+    MongoInitializer(MongoInitializer &&) = delete;
+    MongoInitializer &operator=(MongoInitializer &&) = delete;
+  };
 
-liret MongoService::ping(bson_error_t *error) {
+  static MongoInitializer s_mongo_init;
+
+void MongoClient::destroyMongoClient() {
+  if (m_cPool != nullptr) {
+    mongoc_client_pool_destroy(m_cPool);
+  }
+  if (m_uri != nullptr) {
+    mongoc_uri_destroy(m_uri);
+  }
+}
+
+MongoClient::~MongoClient() { destroyMongoClient(); }
+
+MongoClient::MongoClient(const char *dbUri, const char *dbName)
+    : m_dbName(dbName), m_dbUri(dbUri), m_uri(nullptr), m_cPool(nullptr) {}
+
+liret MongoClient::init(bson_error_t *error) {
+  this->m_uri = mongoc_uri_new_with_error(this->m_dbUri, error);
+  if (this->m_uri == nullptr) {
+    return liret::kInvalidInput;
+  }
+
+  mongoc_uri_set_option_as_int32(this->m_uri, MONGOC_URI_SERVERSELECTIONTIMEOUTMS, MONGO_TIMEOUT_MS);
+
+  this->m_cPool = mongoc_client_pool_new(this->m_uri);
+  if (this->m_cPool == nullptr) {
+    return liret::kUninitialized;
+  }
+
+  if (liret::kOk != ping(error)) {
+    destroyMongoClient();
+    return liret::kAborted;
+  }
+
+  return liret::kOk;
+}
+
+liret MongoClient::ping(bson_error_t *error) {
   mongoc_client_t *client = nullptr;
   liret ret = liret::kOk;
   bson_t ping = BSON_INITIALIZER;
   BSON_APPEND_INT32(&ping, "ping", 1);
+
   do {
-    client = mongoc_client_pool_pop(this->cpool);
+    client = mongoc_client_pool_pop(this->m_cPool);
     if (client == nullptr) {
       ret = liret::kUninitialized;
       break;
     }
-    bool r = mongoc_client_command_simple(client, dbname, &ping, NULL, NULL, error);
+    // mongoc_client_set_sockettimeoutms(client, 200);
+    bool r = mongoc_client_command_simple(client, m_dbName, &ping, NULL, NULL, error);
 
     if (!r) {
       ret = liret::kAborted;
@@ -29,11 +77,19 @@ liret MongoService::ping(bson_error_t *error) {
     break;
   } while (0);
   if (client != nullptr) {
-    mongoc_client_pool_push(cpool, client);
+    mongoc_client_pool_push(m_cPool, client);
   }
   return ret;
 }
-liret MongoService::getImageById(const bson_oid_t *oid, unsigned char **filedata, ssize_t *filesize) {
+
+liret MongoClient::getImageById(const char *id, size_t size, unsigned char **filedata, size_t *filesize) {
+  if (size != 24) {
+    return liret::kInvalidInput;
+  }
+
+  bson_oid_t oid;
+  bson_oid_init_from_string(&oid, id);
+
   mongoc_client_t *client = nullptr;
   mongoc_database_t *database = nullptr;
   mongoc_gridfs_bucket_t *bucket = nullptr;
@@ -49,17 +105,17 @@ liret MongoService::getImageById(const bson_oid_t *oid, unsigned char **filedata
 
   liret ret = liret::kOk;
   do {
-    if (this->cpool == nullptr) {
+    if (this->m_cPool == nullptr) {
       ret = liret::kUninitialized;
       break;
     }
-    client = mongoc_client_pool_pop(this->cpool);
+    client = mongoc_client_pool_pop(this->m_cPool);
     if (client == nullptr) {
       ret = liret::kUninitialized;
       break;
     }
 
-    database = mongoc_client_get_database(client, dbname);
+    database = mongoc_client_get_database(client, m_dbName);
     if (database == nullptr) {
       ret = liret::kAborted;
       break;
@@ -73,7 +129,7 @@ liret MongoService::getImageById(const bson_oid_t *oid, unsigned char **filedata
 
     bson_value_t oid_value;
     oid_value.value_type = BSON_TYPE_OID;
-    memcpy(&oid_value.value.v_oid, oid, sizeof(bson_oid_t));
+    memcpy(&oid_value.value.v_oid, &oid, sizeof(bson_oid_t));
 
     bson_error_t error = {0};
     stream = mongoc_gridfs_bucket_open_download_stream(bucket, &oid_value, &error);
@@ -105,7 +161,7 @@ liret MongoService::getImageById(const bson_oid_t *oid, unsigned char **filedata
   } while (0);
 
   if (client != nullptr) {
-    mongoc_client_pool_push(cpool, client);
+    mongoc_client_pool_push(m_cPool, client);
   }
   if (database != nullptr) {
     mongoc_database_destroy(database);
@@ -120,7 +176,13 @@ liret MongoService::getImageById(const bson_oid_t *oid, unsigned char **filedata
   return ret;
 }
 
-liret MongoService::updateImageById(const bson_oid_t *oid, unsigned char *filedata, ssize_t filesize) {
+liret MongoClient::updateImageById(const char *id, size_t size, unsigned char *filedata, size_t filesize) {
+  if (size != 24) {
+    return liret::kInvalidInput;
+  }
+  bson_oid_t oid;
+  bson_oid_init_from_string(&oid, id);
+
   mongoc_gridfs_t *gridfs = nullptr;
   mongoc_gridfs_file_t *file = nullptr;
   mongoc_client_t *client = nullptr;
@@ -130,17 +192,17 @@ liret MongoService::updateImageById(const bson_oid_t *oid, unsigned char *fileda
 
   liret ret = liret::kOk;
   do {
-    if (this->cpool == nullptr) {
+    if (this->m_cPool == nullptr) {
       ret = liret::kUninitialized;
       break;
     }
-    client = mongoc_client_pool_pop(this->cpool);
+    client = mongoc_client_pool_pop(this->m_cPool);
     if (client == nullptr) {
       ret = liret::kUninitialized;
       break;
     }
 
-    database = mongoc_client_get_database(client, dbname);
+    database = mongoc_client_get_database(client, m_dbName);
     if (database == nullptr) {
       ret = liret::kAborted;
       break;
@@ -151,14 +213,14 @@ liret MongoService::updateImageById(const bson_oid_t *oid, unsigned char *fileda
       ret = liret::kAborted;
       break;
     }
-    gridfs = mongoc_client_get_gridfs(client, this->dbname, "fs", nullptr);
+    gridfs = mongoc_client_get_gridfs(client, this->m_dbName, "fs", nullptr);
     if (gridfs == nullptr) {
       ret = liret::kAborted;
       break;
     }
 
     bson_t query = BSON_INITIALIZER;
-    BSON_APPEND_OID(&query, "_id", oid);
+    BSON_APPEND_OID(&query, "_id", &oid);
     bson_error_t error = {0};
     file = mongoc_gridfs_find_one(gridfs, &query, &error);
     if (error.code == MONGOC_ERROR_GRIDFS_BUCKET_FILE_NOT_FOUND) {
@@ -174,7 +236,7 @@ liret MongoService::updateImageById(const bson_oid_t *oid, unsigned char *fileda
     const bson_t *metadata = mongoc_gridfs_file_get_metadata(file);
     bson_value_t oid_value;
     oid_value.value_type = BSON_TYPE_OID;
-    memcpy(&oid_value.value.v_oid, oid, sizeof(bson_oid_t));
+    memcpy(&oid_value.value.v_oid, &oid, sizeof(bson_oid_t));
 
     if (mongoc_gridfs_file_remove(file, &error) == false) {
       ret = liret::kUnknown;
@@ -220,13 +282,13 @@ liret MongoService::updateImageById(const bson_oid_t *oid, unsigned char *fileda
     mongoc_database_destroy(database);
   }
   if (client != nullptr) {
-    mongoc_client_pool_push(cpool, client);
+    mongoc_client_pool_push(m_cPool, client);
   }
 
   return ret;
 }
 
-int MongoService::mongoTest() {
+int MongoClient::mongoTest() {
   mongoc_client_t *client;
   mongoc_collection_t *collection;
   mongoc_cursor_t *cursor;

@@ -1,5 +1,6 @@
-#include "stdio.h"
-#include "stdlib.h"
+#include <cstdio>
+#include <cstdlib>
+#include <memory>
 #include <thread>
 
 #include <amqpcpp.h>
@@ -9,14 +10,14 @@
 #include "amqp-router/amqp-router.hpp"
 
 #include "image-service/image-service.hpp"
-#include "mongo-client/mongo-client.hpp"
+#include "media-repository/mongo-client.hpp"
 #include "processor-loader.h"
 
 #include "utils/bithacks.h"
 #include "utils/image-info.h"
 
 // TODO: create separate integrational testing pipeline
-#define INTEGRATIONAL_TEST
+//#define INTEGRATIONAL_TEST
 #ifdef INTEGRATIONAL_TEST
 #include "utils/stb-include.h"
 #include <functional>
@@ -84,39 +85,19 @@ int test_mp() {
 #endif
 int main(int argc, char **argv) {
   liret err = liret::kOk;
-#ifndef INTEGRATIONAL_TEST
-  mongoc_init();
 
   bson_error_t error = {0};
-  const char *uri_string = "mongodb://192.168.88.245:8005/?appname=client-example";
-  mongoc_uri_t *uri;
-  uri = mongoc_uri_new_with_error(uri_string, &error);
-
-  if (!uri) {
-    fprintf(stderr,
-            "failed to parse URI: %s\n"
-            "error message:       %s\n",
-            uri_string, error.message);
-    return EXIT_FAILURE;
-  }
-
-  mongoc_client_pool_t *pool = mongoc_client_pool_new(uri);
-  if (!pool) {
-    return EXIT_FAILURE;
-  }
-
-  limb::mongoService = new limb::MongoService("LimbDB", pool);
-  err = limb::mongoService->ping(&error);
+  const char *uriString = "mongodb://192.168.88.245:8005/?appname=client-example";
+  const char *dbString = "LimbDB";
+  std::unique_ptr<limb::MongoClient> repo = std::make_unique<limb::MongoClient>(uriString, dbString);
+  err = repo->init(&error);
   if (err != liret::kOk) {
-    fprintf(stderr,
-            "failed to ping: %s\n"
-            "error message:  %s\n",
-            uri_string, error.message);
+    fprintf(stderr, "failed to initialize Mongo client: %s %s, %s\n", uriString, dbString, error.message);
     return EXIT_FAILURE;
   }
-#endif
+
   // Initialise ImageService
-  limb::imageService = new limb::ImageService;
+  limb::imageService = new limb::ImageService(std::move(repo));
 
   limb::ProcessorLoader loader({"processors"});
   size_t count = loader.processorCount();
@@ -134,7 +115,7 @@ int main(int argc, char **argv) {
 #ifdef INTEGRATIONAL_TEST
   int test_ret = test_mp();
 
-  if (ncnn::get_gpu_instance)
+  if (ncnn::get_gpu_instance())
     ncnn::destroy_gpu_instance();
   return test_ret;
 #endif
@@ -142,7 +123,7 @@ int main(int argc, char **argv) {
   // AMQP preprocess
   AmqpConfig amqpConf;
   amqpConf.heartbeat = 60;
-  AmqpHandler handler("192.168.31.103", 5672, &amqpConf);
+  AmqpHandler handler("192.168.88.250", 5672, &amqpConf);
   AMQP::Connection connection(&handler, AMQP::Login("test", "test"), "/");
   AMQP::Channel ch(&connection);
   // Thread pool preprocess
@@ -172,13 +153,6 @@ int main(int argc, char **argv) {
 
   handler.loop();
   // thd.join();
-#ifndef INTEGRATIONAL_TEST
-  // TODO: Implement better cleanup
-  delete limb::mongoService;
-  mongoc_uri_destroy(uri);
-  mongoc_client_pool_destroy(pool);
-  mongoc_cleanup();
-#endif
 
   delete limb::imageService;
   if (ncnn::get_gpu_instance())

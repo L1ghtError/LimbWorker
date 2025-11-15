@@ -1,6 +1,5 @@
 #include "image-service/image-service.hpp"
 
-#include "mongo-client/mongo-client.hpp"
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "utils/stb-include.h"
@@ -9,20 +8,15 @@ namespace limb {
 
 ImageService *imageService = nullptr;
 
-ImageService::~ImageService() {
-  // TODO: investigate nessesity of manually manage .net lifetime
-  // for (int i = 0; i < m_services.size(); i++) {
-  //   delete m_services[i].net;
-  // }
-}
-liret ImageService::processImage(const MUpscaleImage &input, const ProgressCallback &&procb) {
-  bson_oid_t imageId;
-  // input.imageId Need to be uint8_t[24]
-  bson_oid_init_from_string(&imageId, (const char *)input.imageId);
-  uint8_t *filedata;
-  ssize_t size;
+ImageService::ImageService(std::unique_ptr<MediaRepository> mediaRepo) : m_mediaRepo(std::move(mediaRepo)) {};
 
-  liret ret = limb::mongoService->getImageById(&imageId, &filedata, &size);
+ImageService::~ImageService() {}
+
+liret ImageService::processImage(const MUpscaleImage &input, const ProgressCallback &&procb) {
+  uint8_t *filedata;
+  size_t size;
+
+  liret ret = m_mediaRepo->getImageById((const char *)input.imageId, sizeof(input.imageId), &filedata, &size);
   if (ret != liret::kOk) {
     return ret;
   }
@@ -43,7 +37,7 @@ liret ImageService::processImage(const MUpscaleImage &input, const ProgressCallb
   int outSize = 0;
   uint8_t *outImage = stbi_write_png_to_mem((uint8_t *)outimage.data, 0, outimage.w, outimage.h, outimage.c, &outSize);
 
-  ret = limb::mongoService->updateImageById(&imageId, outImage, outSize);
+  ret = m_mediaRepo->updateImageById((const char *)input.imageId, sizeof(input.imageId), outImage, outSize);
   if (ret != liret::kOk) {
     return ret;
   }
