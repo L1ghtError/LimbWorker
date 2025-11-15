@@ -7,25 +7,27 @@
 #define MONGO_TIMEOUT_MS 5000
 
 namespace limb {
-  class MongoInitializer {
-  public:
-    MongoInitializer() noexcept { mongoc_init(); }
-    ~MongoInitializer() noexcept { mongoc_cleanup(); }
+class MongoInitializer {
+public:
+  MongoInitializer() noexcept { mongoc_init(); }
+  ~MongoInitializer() noexcept { mongoc_cleanup(); }
 
-    MongoInitializer(const MongoInitializer &) = delete;
-    MongoInitializer &operator=(const MongoInitializer &) = delete;
-    MongoInitializer(MongoInitializer &&) = delete;
-    MongoInitializer &operator=(MongoInitializer &&) = delete;
-  };
+  MongoInitializer(const MongoInitializer &) = delete;
+  MongoInitializer &operator=(const MongoInitializer &) = delete;
+  MongoInitializer(MongoInitializer &&) = delete;
+  MongoInitializer &operator=(MongoInitializer &&) = delete;
+};
 
-  static MongoInitializer s_mongo_init;
+static MongoInitializer s_mongo_init;
 
 void MongoClient::destroyMongoClient() {
   if (m_cPool != nullptr) {
     mongoc_client_pool_destroy(m_cPool);
+    m_cPool = nullptr;
   }
   if (m_uri != nullptr) {
     mongoc_uri_destroy(m_uri);
+    m_uri = nullptr;
   }
 }
 
