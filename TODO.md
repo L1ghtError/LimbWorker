@@ -6,7 +6,7 @@
 
 ## 🔴 Refactoring Tasks To-Do High Priority (1)
 - [x] Implement dynamic image processor loading
-- [ ] Implemnet Repository instead of explicit usage of mongodb
+- [x] Implemnet Repository instead of explicit usage of mongodb
 - [ ] Fix mongo-c build on Windows
 - [ ] Implement service that provides unified acess to processors
 - [ ] Increase test coverage
