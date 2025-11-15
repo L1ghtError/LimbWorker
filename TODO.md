@@ -17,6 +17,7 @@
 - [ ] Implement app configuration file
 - [ ] Remove config usage from all modules and move it to the `main`
 - [ ] Optimize image transcoding with `libturbojpeg`
+- [ ] Add pre-commit hooks
 
 📘 Dictionary
 Processor — A module responsible for enhancing or processing provided content, such as images, audio, or other media types. Processors handle specific transformation or optimization tasks, often dynamically loaded depending on the content type.

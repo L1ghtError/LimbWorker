@@ -17,7 +17,7 @@
 #include "utils/image-info.h"
 
 // TODO: create separate integrational testing pipeline
-//#define INTEGRATIONAL_TEST
+// #define INTEGRATIONAL_TEST
 #ifdef INTEGRATIONAL_TEST
 #include "utils/stb-include.h"
 #include <functional>
