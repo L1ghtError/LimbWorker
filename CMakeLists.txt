@@ -59,40 +59,55 @@ macro(compile_shader SHADER_SRC)
     list(APPEND SHADER_SPV_HEX_FILES ${SHADER_int8s_SPV_HEX_FILE})
 endmacro()
 
+# Functions
+function(set_target_output_dirs TARGET_NAME DESIRED_OUTPUT_DIR)
+    if(NOT TARGET ${TARGET_NAME})
+        message(FATAL_ERROR "Target ${TARGET_NAME} does not exist!")
+    endif()
+
+foreach(cfg ${CMAKE_CONFIGURATION_TYPES})
+      string(TOUPPER "${cfg}" cfg)
+      set_target_properties(${TARGET_NAME} PROPERTIES
+         RUNTIME_OUTPUT_DIRECTORY_${cfg} "${DESIRED_OUTPUT_DIR}"
+         LIBRARY_OUTPUT_DIRECTORY_${cfg} "${DESIRED_OUTPUT_DIR}"
+         ARCHIVE_OUTPUT_DIRECTORY_${cfg} "${DESIRED_OUTPUT_DIR}"
+     )
+    endforeach()
+endfunction()
+
 # Flags
 add_definitions(-DNOMINMAX)
 # Options
-option(USE_SYSTEM_NCNN "build with system libncnn" OFF)
-option(USE_SYSTEM_AMQP_CPP "build with system AMQP-CPP" OFF)
-option(USE_SYSTEM_MONGO_C_DRIVER "build with system mongoc" ON) # only optoin for now
+option(USE_SYSTEM_NCNN "build with system libncnn" ON)
+option(USE_SYSTEM_AMQP_CPP "build with system AMQP-CPP" ON)
+option(USE_SYSTEM_MONGO_C_DRIVER "build with system mongoc" ON)
 
 option(ENABLE_TESTS "build with tests" ON)
-
-# Build type used in path determination
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(BUILD_ROUTE "debug")
-else()
-    set(BUILD_ROUTE "release")
-endif()
 
 set(NCNN_ROOTDIR "Dependencies/ncnn")
 set(AMQP_CPP_ROOTDIR "Dependencies/AMQP-CPP")
 set(GTEST_ROOTDIR "Dependencies/googletest")
+set(MONGO_C_DRIVER_ROOTDIR "Dependencies/mongo-c-driver")
 ## Some of commands need absolute path to be executed
 set(ABSOLUTE_NCNN_ROOTDIR "${CMAKE_CURRENT_SOURCE_DIR}/${NCNN_ROOTDIR}")
 set(ABSOLUTE_AMQP_CPP_ROOTDIR "${CMAKE_CURRENT_SOURCE_DIR}/${AMQP_CPP_ROOTDIR}")
 set(ABSOLUTE_GTEST_ROOTDIR "${CMAKE_CURRENT_SOURCE_DIR}/${GTEST_ROOTDIR}")
+set(ABSOLUTE_MONGO_C_DRIVER_ROOTDIR "${CMAKE_CURRENT_SOURCE_DIR}/${MONGO_C_DRIVER_ROOTDIR}")
 
 # Link MONGO-C-DRIVER
 if(USE_SYSTEM_MONGO_C_DRIVER)
-    # TODO: test on linux
-    find_package(mongoc-1.0 REQUIRED)
-    # if(NOT TARGET mongoc)
-    #     message(FATAL_ERROR "mongoc-1.0 target not found!")
-    #     set(USE_SYSTEM_MONGO_C_DRIVER OFF)
-    # endif()
+    find_package(mongoc REQUIRED)
+    if(NOT TARGET mongoc::static)
+        message(FATAL_ERROR "mongoc target not found!")
+    endif()
 endif()
 
+if(NOT USE_SYSTEM_MONGO_C_DRIVER)
+    # build ncnn library
+    if(NOT EXISTS "${ABSOLUTE_MONGO_C_DRIVER_ROOTDIR}/CMakeLists.txt")
+        message(FATAL_ERROR "${ABSOLUTE_MONGO_C_DRIVER_ROOTDIR}/CMakeLists.txt The submodules were not downloaded! Please update submodules with \"git submodule update --init --recursive\" and try again.")
+    endif()
+endif()
 
 # Link AMQP-CPP
 if(USE_SYSTEM_AMQP_CPP)
@@ -233,11 +248,7 @@ target_include_directories(lib_dependencies INTERFACE "${CMAKE_CURRENT_BINARY_DI
 target_include_directories(lib_dependencies INTERFACE "Dependencies/AMQP-CPP/include")
 target_include_directories(lib_dependencies INTERFACE "Dependencies/abnet/include")
 
-# Libs
-target_link_directories(lib_dependencies INTERFACE "Dependencies/AMQP-CPP/build-debug/bin/")
-target_link_directories(lib_dependencies INTERFACE "Dependencies/AMQP-CPP/build-release/bin/")
-
-target_link_libraries(lib_dependencies INTERFACE ncnn amqpcpp mongo::mongoc_static Threads::Threads)
+target_link_libraries(lib_dependencies INTERFACE ncnn amqpcpp mongoc::static Threads::Threads)
 
 # Tests
 if (ENABLE_TESTS)
@@ -253,6 +264,7 @@ endif()
 # Add sources
 file(GLOB_RECURSE SOURCES RELATIVE ${CMAKE_SOURCE_DIR} "src/*")
 add_executable(service ${SOURCES})
+set_target_output_dirs(service "${CMAKE_CURRENT_BINARY_DIR}")
 # Link libraries
 target_link_libraries(service PRIVATE lib_dependencies)
 

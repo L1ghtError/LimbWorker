@@ -1,0 +1,67 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "windows-base",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "installDir": "${sourceDir}/out/install/${presetName}",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "cl.exe",
+                "CMAKE_CXX_COMPILER": "cl.exe",
+                "ncnn_DIR": "C:/Program Files/ncnn/lib/cmake/ncnn",
+                "mongoc_DIR": "C:/mongo-c-driver/lib/cmake/mongoc-2.1.2",
+                "amqpcpp_DIR": "C:/Program Files/amqpcpp/cmake",
+                "USE_SYSTEM_AMQP_CPP": "ON",
+                "USE_SYSTEM_MONGO_C_DRIVER": "ON",
+                "USE_SYSTEM_NCNN": "ON"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
+            "name": "win-x64-debug",
+            "displayName": "win x64 Debug",
+            "inherits": "windows-base",
+            "architecture": {
+                "value": "x64",
+                "strategy": "external"
+            },
+            "cacheVariables": {
+              "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "win-x64-release",
+            "displayName": "win x64 Release",
+            "inherits": "win-x64-debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+        {
+            "name": "win-x86-debug",
+            "displayName": "win x86 Debug",
+            "inherits": "windows-base",
+            "architecture": {
+                "value": "x86",
+                "strategy": "external"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "win-x86-release",
+            "displayName": "win x86 Release",
+            "inherits": "win-x86-debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        }
+    ]
+}

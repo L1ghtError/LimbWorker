@@ -17,6 +17,10 @@ add_custom_target(${PLUGIN_NAME}-generate-spirv DEPENDS ${SHADER_SPV_HEX_FILES})
 
 add_library(${PLUGIN_NAME} MODULE ${SRC_FILES})
 
+set_target_output_dirs(${PLUGIN_NAME} "${CMAKE_CURRENT_BINARY_DIR}")
+
+message(STATUS "CMAKE_CURRENT_BINARY_DIR = ${CMAKE_CURRENT_BINARY_DIR}")
+
 target_include_directories(${PLUGIN_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/processors
     ${CMAKE_SOURCE_DIR}/include

@@ -12,3 +12,6 @@
 	path = Dependencies/abnet
 	url = https://github.com/L1ghtError/abnet.git
 	branch = main
+[submodule "Dependencies/mongo-c-driver"]
+	path = Dependencies/mongo-c-driver
+	url = https://github.com/mongodb/mongo-c-driver.git

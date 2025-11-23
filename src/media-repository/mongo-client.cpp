@@ -224,7 +224,7 @@ liret MongoClient::updateImageById(const char *id, size_t size, unsigned char *f
     bson_t query = BSON_INITIALIZER;
     BSON_APPEND_OID(&query, "_id", &oid);
     bson_error_t error = {0};
-    file = mongoc_gridfs_find_one(gridfs, &query, &error);
+    file = mongoc_gridfs_find_one_with_opts(gridfs, &query, nullptr, &error);
     if (error.code == MONGOC_ERROR_GRIDFS_BUCKET_FILE_NOT_FOUND) {
       ret = liret::kNotFound;
       break;

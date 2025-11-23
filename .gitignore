@@ -2,6 +2,7 @@
 Dependencies/ffmpeg-win64
 Dependencies/libpng-bin
 Dependencies/mongo
+Dependencies/mongo-c-driver
 Dependencies/OpenCL-SDK
 # Prerequisites
 *.d
