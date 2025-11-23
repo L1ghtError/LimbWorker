@@ -263,10 +263,10 @@ if (ENABLE_TESTS)
 endif()
 # Add sources
 file(GLOB_RECURSE SOURCES RELATIVE ${CMAKE_SOURCE_DIR} "src/*")
-add_executable(service ${SOURCES})
-set_target_output_dirs(service "${CMAKE_CURRENT_BINARY_DIR}")
+add_executable(limb_app ${SOURCES})
+set_target_output_dirs(limb_app "${CMAKE_CURRENT_BINARY_DIR}")
 # Link libraries
-target_link_libraries(service PRIVATE lib_dependencies)
+target_link_libraries(limb_app PRIVATE lib_dependencies)
 
 # Configure processor plugins
 add_subdirectory("processors")

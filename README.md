@@ -30,7 +30,18 @@ $ mkdir build
 $ cd build
 $ cmake .. -DCMAKE_BUILD_TYPE=Debug
 $ cmake --build .
-$ .\light-backend
+$ .\limb_app
+```
+
+Windows:
+> **NOTE (Windows):**
+> For successful Windows builds, ensure that `ncnn`, `mongo-c-driver`, and `amqpcpp` are installed under **C:\Program Files**.
+> CMake presets expect them to be discoverable there.
+```bash
+$ cmake --preset win-x64-debug
+$ cd build/win-x64-debug
+$ cmake --build .
+$ .\limb_app
 ```
 
 Docker:
@@ -48,5 +59,5 @@ Docker-compose:
 > **Tech stack:**
 >
 > - [ncnn](https://github.com/Tencent/ncnn) as preferred inference runtime
-> - [mongo-c-driver](https://github.com/mongodb/mongo-c-driver) for communication with workers
-> - [AMQP-CPP](https://github.com/CopernicaMarketingSoftware/AMQP-CPP) for communication with MongoDb
+> - [mongo-c-driver](https://github.com/mongodb/mongo-c-driver) for communication with MongoDb
+> - [AMQP-CPP](https://github.com/CopernicaMarketingSoftware/AMQP-CPP) for communication with workers

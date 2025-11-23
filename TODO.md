@@ -7,7 +7,7 @@
 ## 🔴 Refactoring Tasks To-Do High Priority (1)
 - [x] Implement dynamic image processor loading
 - [x] Implemnet Repository instead of explicit usage of mongodb
-- [ ] Fix mongo-c build on Windows
+- [x] Fix mongo-c build on Windows
 - [ ] Implement service that provides unified acess to processors
 - [ ] Increase test coverage
 - [ ] Change Rabbitmq payload type from raw binary to Protobuffs
