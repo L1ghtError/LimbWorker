@@ -57,7 +57,7 @@ liret MongoClient::init(bson_error_t *error) {
   return liret::kOk;
 }
 
-liret MongoClient::ping(bson_error_t *error) {
+liret MongoClient::ping(bson_error_t *error) const {
   mongoc_client_t *client = nullptr;
   liret ret = liret::kOk;
   bson_t ping = BSON_INITIALIZER;
@@ -84,7 +84,7 @@ liret MongoClient::ping(bson_error_t *error) {
   return ret;
 }
 
-liret MongoClient::getImageById(const char *id, size_t size, unsigned char **filedata, size_t *filesize) {
+liret MongoClient::getImageById(const char *id, size_t size, unsigned char **filedata, size_t *filesize) const {
   if (size != 24) {
     return liret::kInvalidInput;
   }
@@ -178,7 +178,7 @@ liret MongoClient::getImageById(const char *id, size_t size, unsigned char **fil
   return ret;
 }
 
-liret MongoClient::updateImageById(const char *id, size_t size, unsigned char *filedata, size_t filesize) {
+liret MongoClient::updateImageById(const char *id, size_t size, unsigned char *filedata, size_t filesize) const {
   if (size != 24) {
     return liret::kInvalidInput;
   }

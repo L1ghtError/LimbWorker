@@ -81,6 +81,7 @@ add_definitions(-DNOMINMAX)
 option(USE_SYSTEM_NCNN "build with system libncnn" ON)
 option(USE_SYSTEM_AMQP_CPP "build with system AMQP-CPP" ON)
 option(USE_SYSTEM_MONGO_C_DRIVER "build with system mongoc" ON)
+option(USE_SYSTEM_SIMDJSON "build with system simdjson" ON)
 
 option(ENABLE_TESTS "build with tests" ON)
 
@@ -88,11 +89,30 @@ set(NCNN_ROOTDIR "Dependencies/ncnn")
 set(AMQP_CPP_ROOTDIR "Dependencies/AMQP-CPP")
 set(GTEST_ROOTDIR "Dependencies/googletest")
 set(MONGO_C_DRIVER_ROOTDIR "Dependencies/mongo-c-driver")
+set(SIMDJSON_ROOTDIR "Dependencies/simdjson")
 ## Some of commands need absolute path to be executed
 set(ABSOLUTE_NCNN_ROOTDIR "${CMAKE_CURRENT_SOURCE_DIR}/${NCNN_ROOTDIR}")
 set(ABSOLUTE_AMQP_CPP_ROOTDIR "${CMAKE_CURRENT_SOURCE_DIR}/${AMQP_CPP_ROOTDIR}")
 set(ABSOLUTE_GTEST_ROOTDIR "${CMAKE_CURRENT_SOURCE_DIR}/${GTEST_ROOTDIR}")
 set(ABSOLUTE_MONGO_C_DRIVER_ROOTDIR "${CMAKE_CURRENT_SOURCE_DIR}/${MONGO_C_DRIVER_ROOTDIR}")
+set(ABSOLUTE_SIMDJSON_ROOTDIR "${CMAKE_CURRENT_SOURCE_DIR}/${SIMDJSON_ROOTDIR}")
+
+# Link SIMDJSON
+if (USE_SYSTEM_SIMDJSON)
+    find_package(simdjson CONFIG)
+    if (NOT TARGET simdjson::simdjson)
+        message(WARNING "simdjson target not found! USE_SYSTEM_SIMDJSON will be turned off.")
+        set(USE_SYSTEM_SIMDJSON OFF)
+    endif()
+endif()
+
+if(NOT USE_SYSTEM_SIMDJSON)
+    # build ncnn library
+    if(NOT EXISTS "${ABSOLUTE_SIMDJSON_ROOTDIR}/CMakeLists.txt")
+        message(FATAL_ERROR "${ABSOLUTE_SIMDJSON_ROOTDIR}/CMakeLists.txt The submodules were not downloaded! Please update submodules with \"git submodule update --init --recursive\" and try again.")
+    endif()
+    add_subdirectory("${SIMDJSON_ROOTDIR}")
+endif()
 
 # Link MONGO-C-DRIVER
 if(USE_SYSTEM_MONGO_C_DRIVER)
@@ -107,6 +127,7 @@ if(NOT USE_SYSTEM_MONGO_C_DRIVER)
     if(NOT EXISTS "${ABSOLUTE_MONGO_C_DRIVER_ROOTDIR}/CMakeLists.txt")
         message(FATAL_ERROR "${ABSOLUTE_MONGO_C_DRIVER_ROOTDIR}/CMakeLists.txt The submodules were not downloaded! Please update submodules with \"git submodule update --init --recursive\" and try again.")
     endif()
+    add_subdirectory("${MONGO_C_DRIVER_ROOTDIR}")
 endif()
 
 # Link AMQP-CPP
@@ -243,12 +264,10 @@ endif()
 
 add_library(lib_dependencies INTERFACE)
 # Includes
-target_include_directories(lib_dependencies INTERFACE "include")
-target_include_directories(lib_dependencies INTERFACE "${CMAKE_CURRENT_BINARY_DIR}")
 target_include_directories(lib_dependencies INTERFACE "Dependencies/AMQP-CPP/include")
 target_include_directories(lib_dependencies INTERFACE "Dependencies/abnet/include")
 
-target_link_libraries(lib_dependencies INTERFACE ncnn amqpcpp mongoc::static Threads::Threads)
+target_link_libraries(lib_dependencies INTERFACE ncnn amqpcpp mongoc::static Threads::Threads simdjson::simdjson)
 
 # Tests
 if (ENABLE_TESTS)
@@ -261,12 +280,22 @@ if (ENABLE_TESTS)
     add_subdirectory("${GTEST_ROOTDIR}")
     add_subdirectory("tests")
 endif()
-# Add sources
-file(GLOB_RECURSE SOURCES RELATIVE ${CMAKE_SOURCE_DIR} "src/*")
-add_executable(limb_app ${SOURCES})
-set_target_output_dirs(limb_app "${CMAKE_CURRENT_BINARY_DIR}")
-# Link libraries
-target_link_libraries(limb_app PRIVATE lib_dependencies)
+
+# Internal Sources
+    file(GLOB_RECURSE SOURCES RELATIVE ${CMAKE_SOURCE_DIR} "src/internal/*")
+
+    add_library(limb_internal STATIC ${SOURCES})
+    set_target_output_dirs(limb_internal "${CMAKE_CURRENT_BINARY_DIR}")
+    target_include_directories(limb_internal PUBLIC  "include")
+    target_include_directories(limb_internal PUBLIC "${CMAKE_CURRENT_BINARY_DIR}")
+
+    target_link_libraries(limb_internal PUBLIC lib_dependencies)
+
+
+    add_executable(limb_app "src/main.cpp")
+    set_target_output_dirs(limb_app "${CMAKE_CURRENT_BINARY_DIR}")
+    # Link libraries
+    target_link_libraries(limb_app PRIVATE limb_internal)
 
 # Configure processor plugins
 add_subdirectory("processors")

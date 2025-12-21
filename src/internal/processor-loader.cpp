@@ -69,7 +69,6 @@ struct ProcessorModule {
 class ProcessorLoader::impl {
 public:
   impl() {
-
     constexpr char defaultLoadDir[] = "processors";
     m_loadDirectories.push_back(defaultLoadDir);
     loadDirectories();
@@ -157,8 +156,8 @@ public:
     m_processors.erase(it);
   }
 
-  size_t processorCount() { return m_modules.size(); }
-  size_t dirCount() { return m_loadDirectories.size() + 1; }
+  size_t processorCount() const { return m_modules.size(); }
+  size_t dirCount() const { return m_loadDirectories.size() + 1; }
 
   void loadModules(const fs::path &directory) {
     if (!fs::is_directory(directory)) {
@@ -248,12 +247,13 @@ std::string ProcessorLoader::processorName(size_t index) { return pImpl->process
 ImageProcessor *ProcessorLoader::allocateProcessor(size_t index) { return pImpl->allocateProcessor(index); }
 void ProcessorLoader::destroyProcessor(ImageProcessor *processor) { return pImpl->destroyProcessor(processor); }
 
-size_t ProcessorLoader::processorCount() { return pImpl->processorCount(); }
-size_t ProcessorLoader::dirCount() { return pImpl->dirCount(); }
+size_t ProcessorLoader::processorCount() const { return pImpl->processorCount(); }
+size_t ProcessorLoader::dirCount() const { return pImpl->dirCount(); }
 
-ProcessorLoader::ProcessorLoader() = default;
+ProcessorLoader::ProcessorLoader() : pImpl{std::make_unique<impl>()} {};
 ProcessorLoader::ProcessorLoader(const std::vector<std::string> &additionalDirectories)
     : pImpl{std::make_unique<impl>(additionalDirectories)} {}
+ProcessorLoader::ProcessorLoader(ProcessorLoader &&pl) : pImpl{std::move(pl.pImpl)} {}
 ProcessorLoader::~ProcessorLoader() = default;
 
 } // namespace limb
