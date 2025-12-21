@@ -5,7 +5,6 @@
 #include <memory>
 #include <string>
 
-
 #include "utils/status.h"
 
 namespace limb {
@@ -14,7 +13,7 @@ class CapabilitiesProvider {
 public:
   CapabilitiesProvider();
   ~CapabilitiesProvider();
-  CapabilitiesProvider(CapabilitiesProvider && cp);
+  CapabilitiesProvider(CapabilitiesProvider &&cp);
 
   // Add a processor so the capabilities provider will report that we are capable of using it
   liret addAvailableProcessor(std::string name, uint32_t index);
