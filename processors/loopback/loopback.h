@@ -20,7 +20,7 @@ namespace limb {
 class LIMB_API LoopbackProcessor : public ImageProcessor {
 public:
   LoopbackProcessor();
-  ~LoopbackProcessor();
+  ~LoopbackProcessor() override;
 
   liret init() override;
 

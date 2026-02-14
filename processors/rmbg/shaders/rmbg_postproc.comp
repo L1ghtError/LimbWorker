@@ -1,0 +1,43 @@
+
+#version 450
+
+#extension GL_EXT_shader_8bit_storage : require
+
+layout(binding = 0) readonly buffer bottom_blob { uint8_t bottom_blob_data[]; };
+layout(binding = 1) readonly buffer mask_blob { float mask_blob_data[]; };
+
+layout(binding = 2) writeonly buffer top_blob { uint8_t top_blob_data[]; };
+
+layout(push_constant) uniform parameter {
+  int w;
+  int h;
+  int cstep;
+
+  int mask_w;
+  int mask_h;
+
+  int in_channels;
+  int channels;
+}
+p;
+
+void main() {
+  int gx = int(gl_GlobalInvocationID.x);
+  int gy = int(gl_GlobalInvocationID.y);
+  int gz = int(gl_GlobalInvocationID.z);
+
+  if (gx >= p.w || gy >= p.h || gz >= 4)
+    return;
+
+  int index = (gy * p.w + gx);
+  uint v;
+  if (gz == 3) {
+    int mx = gx * p.mask_w / p.w;
+    int my = gy * p.mask_h / p.h;
+    float mask = mask_blob_data[my * p.mask_w + mx];
+    v = uint(mask * 255.f);
+  } else {
+    v = uint(bottom_blob_data[index * p.in_channels + gz]);
+  }
+  top_blob_data[index * p.channels + gz] = uint8_t(v);
+}

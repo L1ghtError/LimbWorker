@@ -1,5 +1,4 @@
 #include "realesrgan/realesrgan-processor.h"
-
 #include <algorithm>
 
 // Auto generated with glslangValidator
@@ -38,7 +37,6 @@ static const uint32_t realesrgan_postproc_tta_fp16s_spv_data[] = {
 #include "realesrgan_postproc_tta_fp16s.spv.hex.h"
 };
 static const uint32_t realesrgan_postproc_tta_int8s_spv_data[] = {
-#include "realesrgan-processor.h"
 #include "realesrgan_postproc_tta_int8s.spv.hex.h"
 };
 
@@ -59,26 +57,47 @@ RealesrganProcessor::RealesrganProcessor(ncnn::Net *_net, bool _tta_mode)
       bicubic_4x(nullptr), scale(0), tilesize(0), prepadding(0) {}
 
 RealesrganProcessor::~RealesrganProcessor() {
-  delete realesrgan_preproc;
-  delete realesrgan_postproc;
+  if (realesrgan_preproc != nullptr) {
+    delete realesrgan_preproc;
+    realesrgan_preproc = nullptr;
+  }
 
-  if (net_owner)
-    delete net;
+  if (realesrgan_postproc != nullptr) {
+    delete realesrgan_postproc;
+    realesrgan_postproc = nullptr;
+  }
 
-  if (bicubic_2x != nullptr)
+  if (bicubic_2x != nullptr) {
     bicubic_2x->destroy_pipeline(net->opt);
-  delete bicubic_2x;
+    delete bicubic_2x;
+    bicubic_2x = nullptr;
+  }
 
-  if (bicubic_3x != nullptr)
+  if (bicubic_3x != nullptr) {
     bicubic_3x->destroy_pipeline(net->opt);
-  delete bicubic_3x;
+    delete bicubic_3x;
+    bicubic_3x = nullptr;
+  }
 
-  if (bicubic_4x != nullptr)
+  if (bicubic_4x != nullptr) {
     bicubic_4x->destroy_pipeline(net->opt);
-  delete bicubic_4x;
+    delete bicubic_4x;
+    bicubic_4x = nullptr;
+  }
+
+  if (net_owner && net != nullptr) {
+    net->clear();
+    delete net;
+    net = nullptr;
+  }
+
+  // Since this module is a separate shared library, it is safe to destroy the NCNN GPU instance,
+  // and it will not affect other modules.
+  ncnn::destroy_gpu_instance();
 }
 
 liret RealesrganProcessor::init() {
+  // The NCNN GPU instance is unique per shared library, so each module needs to handle it manually.
   ncnn::create_gpu_instance();
 
   scale = 4;

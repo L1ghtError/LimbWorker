@@ -2,12 +2,9 @@
 #define _REALESRGAN_PROCESSOR_H_
 #include "image-processor.h"
 
-#include <gpu.h>
-#include <layer.h>
-#include <net.h>
-
 #ifdef _WIN32
 #ifdef REALESRGAN_EXPORTS
+#include <windows.h>
 #define LIMB_API __declspec(dllexport)
 #else
 #define LIMB_API __declspec(dllimport)
@@ -16,12 +13,16 @@
 #define LIMB_API
 #endif
 
+#include <gpu.h>
+#include <layer.h>
+#include <net.h>
+
 namespace limb {
 class LIMB_API RealesrganProcessor : public ImageProcessor {
 public:
   RealesrganProcessor();
   RealesrganProcessor(ncnn::Net *net, bool tta_mode = false);
-  ~RealesrganProcessor();
+  ~RealesrganProcessor() override;
 
   virtual liret init() override;
 

@@ -1,6 +1,4 @@
-#define STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "utils/stb-include.h"
+#include "utils/stb-wrap.h"
 
 #include <gtest/gtest.h>
 
@@ -91,25 +89,40 @@ class InferenceRunner : public ::testing::Test {
 
     application = std::make_unique<
         limb::App<limb::ImageService<MockRepository>, limb::ProcessorLoader, limb::CapabilitiesProvider>>(
-        limb::ImageService<MockRepository>(MockRepository(filepath)), limb::ProcessorLoader({"processors"}),
+        limb::ImageService<MockRepository>(MockRepository(filepath)), limb::ProcessorLoader({"../processors"}),
         limb::CapabilitiesProvider());
 
-    application->init();
+    ASSERT_EQ(application->init(), liret::kOk) << "Failed to initialize application";
   }
 
-  void TearDown() override { application->deinit(); }
+  void TearDown() override {
+    if (application)
+      application->deinit();
+  }
 
 protected:
-  std::unique_ptr<limb::AppBase> application;
+  std::unique_ptr<limb::AppBase> application{nullptr};
 };
 
-TEST_F(InferenceRunner, loopback_verify) {
+TEST_F(InferenceRunner, rmbg_verify) {
+  const char pn[] = "RMBG-1.4";
+  size_t pc = findProcessorByName(application.get(), pn);
+  ASSERT_NE(pc, -1) << pn << " not found!";
+
+  limb::ImageTask task{.imageId = "./rmbg_test_output.png"};
+  task.modelId = pc;
+
+  liret ret = application->processImage(task);
+  ASSERT_EQ(ret, liret::kOk) << "Failed to process image";
+}
+
+TEST_F(InferenceRunner, realEsrgan_verify) {
   const char pn[] = "Real-ESRGAN";
   size_t pc = findProcessorByName(application.get(), pn);
   ASSERT_NE(pc, -1) << pn << " not found!";
 
-  limb::ImageTask pbody{.imageId = "./outmem.png"};
-  pbody.modelId = pc;
+  limb::ImageTask task{.imageId = "./realesrgan_test_output.png"};
+  task.modelId = pc;
 
   auto log_delta_ms = [](float val) {
     using clock = std::chrono::steady_clock;
@@ -122,11 +135,13 @@ TEST_F(InferenceRunner, loopback_verify) {
     std::fprintf(stdout, "%.2f, t = %lld ms\n", val, (long long)ms);
   };
 
-  liret ret = application->processImage(pbody, [log_delta_ms](float val) { log_delta_ms(val); });
+  liret ret = application->processImage(task, [log_delta_ms](float val) { log_delta_ms(val); });
   ASSERT_EQ(ret, liret::kOk) << "Failed to process image";
 }
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
+  //
+  ::testing::FLAGS_gtest_catch_exceptions = false;
   return RUN_ALL_TESTS();
 }

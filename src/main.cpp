@@ -6,9 +6,7 @@
 #include <amqpcpp.h>
 #include <gpu.h>
 
-#define STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "utils/stb-include.h"
+#include "utils/stb-wrap.h"
 
 #include "amqp-handler/amqp-handler.hpp"
 #include "amqp-router/amqp-router.hpp"
@@ -45,7 +43,7 @@ template <class limbApp> int test_mp(limbApp &application) {
   int x, y, c;
   std::string ext = ".png";
   std::string fullinput = "";
-  fullinput += "inmem";
+  fullinput += "input";
   unsigned char *pixeldataOne = stbi_load((fullinput + ext).c_str(), &x, &y, &c, 0);
 
   int x1, y1, c1;
@@ -95,8 +93,8 @@ template <class limbApp> int test_mp(limbApp &application) {
   // threadPool.post(std::move(packTwo));
   futOne.get();
   // futTwo.get();
-  stbi_write_png((fullinput + "one" + "out" + ext).c_str(), x * 4, y * 4, c, outimageOne.data, 0);
-  // stbi_write_png((fullinput + "two" + "out" + ext).c_str(), x1 * 4, y1 * 4, c1, outimageTwo.data, 0);
+  lib_image_write_png((fullinput + "one" + "out" + ext).c_str(), x * 4, y * 4, c, outimageOne.data, 0);
+  // lib_image_write_png((fullinput + "two" + "out" + ext).c_str(), x1 * 4, y1 * 4, c1, outimageTwo.data, 0);
 
   delete pixeldataOne;
   delete pixeldataTwo;

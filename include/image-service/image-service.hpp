@@ -11,7 +11,7 @@
 
 #include "media-repository/media-repository.hpp"
 
-#include "utils/stb-include.h"
+#include "utils/stb-wrap.h"
 
 namespace limb {
 struct ImageTask {
@@ -65,7 +65,7 @@ public:
 
     int outSize = 0;
     std::unique_ptr<uint8_t[], decltype(stbiDeleter)> outImage(
-        stbi_write_png_to_mem(outPixel.get(), 0, outImageInfo.w, outImageInfo.h, outImageInfo.c, &outSize),
+        lib_image_write_png_to_mem(outPixel.get(), 0, outImageInfo.w, outImageInfo.h, outImageInfo.c, &outSize),
         stbiDeleter);
 
     return m_mediaRepo.updateImageById(input.imageId.c_str(), input.imageId.size(), outImage.get(), outSize);

@@ -6,8 +6,6 @@
 #include <string>
 #include <vector>
 
-#include "utils/stb-include.h"
-
 #include "capabilities-provider.h"
 #include "image-service/image-service.hpp"
 #include "processor-loader.h"
@@ -77,15 +75,16 @@ public:
 
   void deinit() override {
     std::lock_guard<CapProvider> lock(m_capProvider);
+    const size_t pc = m_mediaService.processorCount();
 
-    for (int i = 0; i < m_mediaService.processorCount(); i++) {
+    for (int i = 0; i < pc; i++) {
       ImageProcessor *p;
       if (m_mediaService.getProcessor(i, &p) == liret::kOk) {
         m_processorLoader.destroyProcessor(p);
       }
-      m_capProvider.clear();
-      m_mediaService.clear();
     }
+    m_capProvider.clear();
+    m_mediaService.clear();
   }
 
   liret processImage(const ImageTask &input, const ProgressCallback &&procb) override {

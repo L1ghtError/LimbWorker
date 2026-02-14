@@ -6,6 +6,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 function(build_test test_name)
     add_executable(${test_name}_test ${ARGN}) 
     target_link_libraries(${test_name}_test PRIVATE gtest gtest_main limb_internal)
+    set_target_output_dirs(${test_name}_test "${CMAKE_CURRENT_BINARY_DIR}")
     add_test(${test_name} ./${test_name}_test)
 endfunction()
 

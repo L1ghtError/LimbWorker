@@ -1,6 +1,4 @@
-#define STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "utils/stb-include.h"
+#include "utils/stb-wrap.h"
 
 #include <gtest/gtest.h>
 
