@@ -9,7 +9,7 @@
             "installDir": "${sourceDir}/install/${presetName}",
             "cacheVariables": {
                 "ncnn_DIR": "C:/Program Files/ncnn/lib/cmake/ncnn",
-                "mongoc_DIR": "C:/mongo-c-driver/lib/cmake/mongoc-2.1.2",
+                "mongoc_DIR": "C:/Program Files/mongo-c-driver/lib/cmake/mongoc-2.1.2",
                 "amqpcpp_DIR": "C:/Program Files/amqpcpp/cmake",
                 "USE_SYSTEM_AMQP_CPP": "ON",
                 "USE_SYSTEM_MONGO_C_DRIVER": "ON",
@@ -37,26 +37,6 @@
             "name": "win-x64-release",
             "displayName": "win x64 Release",
             "inherits": "win-x64-debug",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
-            }
-        },
-        {
-            "name": "win-x86-debug",
-            "displayName": "win x86 Debug",
-            "inherits": "windows-base",
-            "architecture": {
-                "value": "x86",
-                "strategy": "external"
-            },
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug"
-            }
-        },
-        {
-            "name": "win-x86-release",
-            "displayName": "win x86 Release",
-            "inherits": "win-x86-debug",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
             }

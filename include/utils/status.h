@@ -22,6 +22,8 @@ enum class ReturnStatus : int {
   kUnimplemented = 5,
   kUninitialized = 6,
   kInvalidInput = 7,
+  kIncomplete = 8,
+  kBufferTooSmall = 9,
 };
 
 class StatusManager {

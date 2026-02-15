@@ -19,10 +19,10 @@ public:
   void destroyMongoClient();
 
   static int mongoTest();
-  liret ping(bson_error_t *error);
+  liret ping(bson_error_t *error) const;
 
-  liret getImageById(const char *id, size_t size, unsigned char **filedata, size_t *filesize) override;
-  liret updateImageById(const char *id, size_t size, unsigned char *filedata, size_t filesize) override;
+  liret getImageById(const char *id, size_t size, unsigned char **filedata, size_t *filesize) const override;
+  liret updateImageById(const char *id, size_t size, unsigned char *filedata, size_t filesize) const override;
 
 private:
   mongoc_uri_t *m_uri;

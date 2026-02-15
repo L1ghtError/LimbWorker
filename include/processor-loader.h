@@ -3,9 +3,10 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
-#include "image-processor.h"
+#include "processor-module.h"
 #include "utils/status.h"
 
 namespace limb {
@@ -13,6 +14,7 @@ class ProcessorLoader {
 public:
   ProcessorLoader();
   ProcessorLoader(const std::vector<std::string> &additionalDirectories);
+  ProcessorLoader(ProcessorLoader &&pl);
   ~ProcessorLoader();
 
   liret status();
@@ -21,12 +23,12 @@ public:
   liret addLoadDir(const std::string &dirPath);
   liret removeLoadDir(size_t index);
 
-  std::string processorName(size_t index);
-  ImageProcessor *allocateProcessor(size_t index);
-  void destroyProcessor(ImageProcessor *processor);
+  std::string_view processorName(size_t index);
+  ProcessorContainer *allocateContainer(size_t index);
+  void destroyContainer(ProcessorContainer *container);
 
-  size_t processorCount();
-  size_t dirCount();
+  size_t processorCount() const;
+  size_t dirCount() const;
 
 private:
   class impl;
