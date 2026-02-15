@@ -22,6 +22,23 @@
             }
         },
         {
+            "name": "linux-base",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "installDir": "${sourceDir}/install/${presetName}",
+            "cacheVariables": {
+                "USE_SYSTEM_AMQP_CPP": "OFF",
+                "USE_SYSTEM_MONGO_C_DRIVER": "OFF",
+                "USE_SYSTEM_NCNN": "OFF"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            }
+        },
+        {
             "name": "win-x64-debug",
             "displayName": "win x64 Debug",
             "inherits": "windows-base",
@@ -37,6 +54,26 @@
             "name": "win-x64-release",
             "displayName": "win x64 Release",
             "inherits": "win-x64-debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+        {
+            "name": "linux-x64-debug",
+            "displayName": "linux x64 Debug",
+            "inherits": "linux-base",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "installDir": "${sourceDir}/install/${presetName}",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "linux-x64-release",
+            "displayName": "linux x64 Release",
+            "inherits": "linux-base",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "installDir": "${sourceDir}/install/${presetName}",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
             }
