@@ -1,5 +1,7 @@
 #include "realesrgan/realesrgan-processor.h"
+
 #include <algorithm>
+#include <mutex>
 
 // Auto generated with glslangValidator
 static const uint32_t realesrgan_preproc_spv_data[] = {
@@ -39,6 +41,39 @@ static const uint32_t realesrgan_postproc_tta_fp16s_spv_data[] = {
 static const uint32_t realesrgan_postproc_tta_int8s_spv_data[] = {
 #include "realesrgan_postproc_tta_int8s.spv.hex.h"
 };
+
+// TODO refactor processor module api
+class NcnnGpuManager {
+public:
+  void tryCreate() {
+    std::lock_guard lock(mutex);
+    if (counter == 0) {
+      // The NCNN GPU instance is unique per shared library, so each module needs to handle it manually.
+      ncnn::create_gpu_instance();
+    }
+    ++counter;
+  }
+
+  void tryDestroy() {
+    std::lock_guard lock(mutex);
+
+    if (counter == 0) {
+      return;
+    }
+    if (counter == 1) {
+      // Since this module is a separate shared library, it is safe to destroy the NCNN GPU instance,
+      // and it will not affect other modules.
+      ncnn::destroy_gpu_instance();
+    }
+    --counter;
+  }
+
+private:
+  int counter = 0;
+  std::mutex mutex;
+};
+
+static NcnnGpuManager _manager;
 
 extern "C" LIMB_API limb::RealesrganProcessor *createProcessor() { return new limb::RealesrganProcessor; }
 
@@ -91,15 +126,11 @@ RealesrganProcessor::~RealesrganProcessor() {
     net = nullptr;
   }
 
-  // Since this module is a separate shared library, it is safe to destroy the NCNN GPU instance,
-  // and it will not affect other modules.
-  ncnn::destroy_gpu_instance();
+  _manager.tryDestroy();
 }
 
 liret RealesrganProcessor::init() {
-  // The NCNN GPU instance is unique per shared library, so each module needs to handle it manually.
-  ncnn::create_gpu_instance();
-
+  _manager.tryCreate();
   scale = 4;
   tilesize = 200;
   prepadding = 10;

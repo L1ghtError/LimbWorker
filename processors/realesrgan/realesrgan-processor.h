@@ -4,7 +4,6 @@
 
 #ifdef _WIN32
 #ifdef REALESRGAN_EXPORTS
-#include <windows.h>
 #define LIMB_API __declspec(dllexport)
 #else
 #define LIMB_API __declspec(dllimport)

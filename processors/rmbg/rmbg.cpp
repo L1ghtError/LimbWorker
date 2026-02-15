@@ -1,11 +1,10 @@
 #include "rmbg/rmbg.h"
 
 #include "cpu.h"
-#include "net.h"
 #include <gpu.h>
 
 #include <fstream>
-
+#include <mutex>
 /*
 static const uint32_t rmbg_preproc_spv_data[] = {
 #include "rmbg_preproc.spv.hex.h"
@@ -15,6 +14,39 @@ static const uint32_t rmbg_preproc_spv_data[] = {
 static const uint32_t rmbg_postproc_spv_data[] = {
 #include "rmbg_postproc.spv.hex.h"
 };
+
+// TODO refactor processor module api
+class NcnnGpuManager {
+public:
+  void tryCreate() {
+    std::lock_guard lock(mutex);
+    if (counter == 0) {
+      // The NCNN GPU instance is unique per shared library, so each module needs to handle it manually.
+      ncnn::create_gpu_instance();
+    }
+    ++counter;
+  }
+
+  void tryDestroy() {
+    std::lock_guard lock(mutex);
+
+    if (counter == 0) {
+      return;
+    }
+    if (counter == 1) {
+      // Since this module is a separate shared library, it is safe to destroy the NCNN GPU instance,
+      // and it will not affect other modules.
+      ncnn::destroy_gpu_instance();
+    }
+    --counter;
+  }
+
+private:
+  int counter = 0;
+  std::mutex mutex;
+};
+
+static NcnnGpuManager _manager;
 
 constexpr const char *kModelPath = "../models/RMBG-1.4/onnx/model.onnx";
 
@@ -73,15 +105,26 @@ RmbgProcessor::RmbgProcessor()
     : env(ORT_LOGGING_LEVEL_WARNING, "RMBG_1_4"),
       memInfo(Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeCPU)) {}
 RmbgProcessor::~RmbgProcessor() {
+
+  if (vulkanDevice) {
+    delete vulkanDevice;
+    vulkanDevice = nullptr;
+  }
+
+  if (rmbg_postproc) {
+    delete rmbg_postproc;
+    rmbg_postproc = nullptr;
+  }
+
   if (session) {
     delete session;
     session = nullptr;
   }
+  _manager.tryDestroy();
 };
 
 liret RmbgProcessor::init() {
-  ncnn::create_gpu_instance();
-
+  _manager.tryCreate();
   sessionOptions.SetLogSeverityLevel(ORT_LOGGING_LEVEL_WARNING);
 
   if (cudaSuppored()) {
@@ -113,16 +156,8 @@ liret RmbgProcessor::load() {
   // if not, we need to manage device lifetime
   vulkanDevice = new ncnn::VulkanDevice(gpuIndex);
 
-  rmbg_preproc = new ncnn::Pipeline(vulkanDevice);
-  // Related to vkCmdDispath groupCountX/Y/Z
-  rmbg_preproc->set_optimal_local_size_xyz(32, 32, 3);
-
   rmbg_postproc = new ncnn::Pipeline(vulkanDevice);
-  // Related to vkCmdDispath groupCountX/Y/Z
   rmbg_postproc->set_optimal_local_size_xyz(32, 32, 3);
-  /*
-    rmbg_preproc->create(rmbg_preproc_spv_data, sizeof(rmbg_preproc_spv_data), specializations);
-*/
   rmbg_postproc->create(rmbg_postproc_spv_data, sizeof(rmbg_postproc_spv_data), specializations);
 
   return liret::kOk;

@@ -74,7 +74,8 @@ private:
 };
 
 class InferenceRunner : public ::testing::Test {
-  void SetUp() override {
+public:
+  static void SetUpTestSuite() {
     namespace fs = std::filesystem;
 
     fs::path cwd = fs::current_path();
@@ -95,14 +96,15 @@ class InferenceRunner : public ::testing::Test {
     ASSERT_EQ(application->init(), liret::kOk) << "Failed to initialize application";
   }
 
-  void TearDown() override {
+  static void TearDownTestSuite() {
     if (application)
       application->deinit();
   }
 
-protected:
-  std::unique_ptr<limb::AppBase> application{nullptr};
+  static std::unique_ptr<limb::AppBase> application;
 };
+
+std::unique_ptr<limb::AppBase> InferenceRunner::application;
 
 TEST_F(InferenceRunner, rmbg_verify) {
   const char pn[] = "RMBG-1.4";
