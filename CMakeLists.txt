@@ -9,7 +9,14 @@ find_package(Threads REQUIRED)
 # Vulkan
 find_package(Vulkan REQUIRED)
 # Macros
-find_program(GLSLANGVALIDATOR_EXECUTABLE NAMES glslangValidator PATHS $ENV{VULKAN_SDK}/bin NO_CMAKE_FIND_ROOT_PATH)
+find_program(GLSLANGVALIDATOR_EXECUTABLE NAMES glslangValidator
+    PATHS $ENV{VULKAN_SDK}/bin /usr/bin /usr/local/bin
+    NO_CMAKE_FIND_ROOT_PATH)
+
+if(NOT GLSLANGVALIDATOR_EXECUTABLE)
+    message(FATAL_ERROR "glslangValidator not found! Please install the Vulkan SDK or glslang-tools.")
+endif()
+
 message(STATUS "Found glslangValidator: ${GLSLANGVALIDATOR_EXECUTABLE}")
 
 macro(compile_shader SHADER_SRC)

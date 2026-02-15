@@ -1,5 +1,7 @@
 #include "loopback/loopback.h"
 
+#include <cstring>
+
 extern "C" LIMB_API limb::LoopbackModule *createProcessor() { return new limb::LoopbackModule; }
 
 namespace limb {
