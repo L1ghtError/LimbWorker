@@ -11,7 +11,7 @@ public:
   impl() : m_totalCpuThreads(std::thread::hardware_concurrency()) {}
   ~impl() {}
 
-  liret addAvailableProcessor(std::string name, uint32_t index) {
+  liret addAvailableProcessor(std::string_view name, uint32_t index) {
     if (m_availableProcessors.size() < index + 1) {
       m_availableProcessors.resize(index + 1);
     } else if (!m_availableProcessors[index].empty()) {
@@ -104,7 +104,7 @@ private:
 };
 
 using Cp = CapabilitiesProvider;
-liret Cp::addAvailableProcessor(std::string name, uint32_t index) { return pImpl->addAvailableProcessor(name, index); }
+liret Cp::addAvailableProcessor(std::string_view name, uint32_t index) { return pImpl->addAvailableProcessor(name, index); }
 liret Cp::removeAvailableProcessor(uint32_t index) { return pImpl->removeAvailableProcessor(index); }
 void Cp::clear() { return pImpl->clear(); }
 void Cp::invalidate() { pImpl->invalidate(); }

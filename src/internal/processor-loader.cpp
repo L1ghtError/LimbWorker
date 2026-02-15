@@ -11,7 +11,6 @@ typedef void *LibHandle;
 #include <algorithm>
 #include <filesystem>
 #include <mutex>
-#include <string_view>
 #include <unordered_map>
 
 namespace {
@@ -94,15 +93,13 @@ namespace limb {
 
 namespace fs = std::filesystem;
 
-typedef limb::ImageProcessor *(*create_fn_t)();
-typedef void (*destroy_fn_t)(limb::ImageProcessor *);
-typedef const char *(*name_fn_t)();
+typedef limb::ProcessorModule *(*getModule_fn_t)();
 
-struct ProcessorModule {
+struct LoadedModule {
   LibHandle m_handle;
-  create_fn_t create_fn;
-  destroy_fn_t destroy_fn;
-  name_fn_t name_fn;
+  limb::ProcessorModule *procModule;
+
+  getModule_fn_t getModule_fn;
 };
 
 class ProcessorLoader::impl {
@@ -163,37 +160,37 @@ public:
     m_loadDirectories.erase(m_loadDirectories.begin() + index);
   }
 
-  std::string processorName(size_t index) {
+  std::string_view processorName(size_t index) {
     std::lock_guard<std::mutex> lock(m_mutex);
     if (index >= m_modules.size()) {
-      return std::string();
+      return {};
     }
-    auto name = m_modules[index].name_fn();
-    return name ? std::string(name) : std::string();
+
+    return m_modules[index].procModule->name();
   }
 
-  ImageProcessor *allocateProcessor(size_t index) {
+  ProcessorContainer *allocateContainer(size_t index) {
     std::lock_guard<std::mutex> lock(m_mutex);
     if (index < m_modules.size()) {
-      ImageProcessor *ip = m_modules[index].create_fn();
-      if (!ip) {
+      ProcessorContainer *container = m_modules[index].procModule->allocateContainer();
+      if (!container) {
         return nullptr;
       }
-      m_processors[ip] = index;
-      return ip;
+      m_processors[container] = index;
+      return container;
     }
 
     return nullptr;
   }
 
-  void destroyProcessor(ImageProcessor *processor) {
+  void destroyContainer(ProcessorContainer *container) {
     std::lock_guard<std::mutex> lock(m_mutex);
-    const auto it = m_processors.find(processor);
+    const auto it = m_processors.find(container);
 
     if (it == m_processors.end())
       return;
 
-    m_modules[it->second].destroy_fn(processor);
+    m_modules[it->second].procModule->deallocateContainer(container);
     m_processors.erase(it);
   }
 
@@ -206,12 +203,10 @@ public:
       return false;
     }
 
-    create_fn_t create_fn = reinterpret_cast<create_fn_t>(getFunction(handle, "createProcessor"));
-    destroy_fn_t destroy_fn = reinterpret_cast<destroy_fn_t>(getFunction(handle, "destroyProcessor"));
-    name_fn_t name_fn = reinterpret_cast<name_fn_t>(getFunction(handle, "processorName"));
+    getModule_fn_t getModule_fn = reinterpret_cast<getModule_fn_t>(getFunction(handle, "GetProcessorModule"));
 
     bool success = true;
-    if (!create_fn || !destroy_fn || !name_fn) {
+    if (!getModule_fn) {
       success = false;
     }
 
@@ -247,18 +242,16 @@ public:
         }
       }
 
-      create_fn_t create_fn = reinterpret_cast<create_fn_t>(getFunction(handle, "createProcessor"));
-      destroy_fn_t destroy_fn = reinterpret_cast<destroy_fn_t>(getFunction(handle, "destroyProcessor"));
-      name_fn_t name_fn = reinterpret_cast<name_fn_t>(getFunction(handle, "processorName"));
+      getModule_fn_t getModule_fn = reinterpret_cast<getModule_fn_t>(getFunction(handle, "GetProcessorModule"));
 
       // TODO: consider display a warning
-      if (!create_fn || !destroy_fn || !name_fn) {
+      if (!getModule_fn) {
         unloadLibrary(handle);
         continue;
       }
 
       std::lock_guard<std::mutex> lock(m_mutex);
-      m_modules.emplace_back(handle, create_fn, destroy_fn, name_fn);
+      m_modules.emplace_back(handle, getModule_fn(), getModule_fn);
     }
   }
 
@@ -290,8 +283,8 @@ public:
 
 private:
   std::vector<std::string> m_loadDirectories;
-  std::unordered_map<ImageProcessor *, size_t> m_processors;
-  std::vector<ProcessorModule> m_modules;
+  std::unordered_map<ProcessorContainer *, size_t> m_processors;
+  std::vector<LoadedModule> m_modules;
   std::mutex m_mutex;
 };
 
@@ -314,9 +307,9 @@ liret ProcessorLoader::removeLoadDir(size_t index) {
   return reload();
 }
 
-std::string ProcessorLoader::processorName(size_t index) { return pImpl->processorName(index); }
-ImageProcessor *ProcessorLoader::allocateProcessor(size_t index) { return pImpl->allocateProcessor(index); }
-void ProcessorLoader::destroyProcessor(ImageProcessor *processor) { return pImpl->destroyProcessor(processor); }
+std::string_view ProcessorLoader::processorName(size_t index) { return pImpl->processorName(index); }
+ProcessorContainer *ProcessorLoader::allocateContainer(size_t index) { return pImpl->allocateContainer(index); }
+void ProcessorLoader::destroyContainer(ProcessorContainer *container) { return pImpl->destroyContainer(container); }
 
 size_t ProcessorLoader::processorCount() const { return pImpl->processorCount(); }
 size_t ProcessorLoader::dirCount() const { return pImpl->dirCount(); }

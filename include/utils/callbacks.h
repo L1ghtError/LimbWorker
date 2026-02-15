@@ -6,5 +6,7 @@ namespace limb {
 
 using ProgressCallback = std::function<void(float currnetProgress)>;
 
-}
+inline ProgressCallback defaultProgressCallback = [](float val) {};
+
+} // namespace limb
 #endif // _CALLBACKS_H_

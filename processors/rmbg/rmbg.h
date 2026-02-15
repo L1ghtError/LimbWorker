@@ -1,7 +1,7 @@
 #ifndef _RMBG_PROCESSOR_H_
 #define _RMBG_PROCESSOR_H_
 
-#include "image-processor.h"
+#include "processor-module.h"
 
 #ifdef _WIN32
 #ifdef RMBG_EXPORTS
@@ -22,44 +22,66 @@
 #include <vector>
 
 namespace limb {
-class LIMB_API RmbgProcessor : public ImageProcessor {
+
+constexpr auto g_processorName = "RMBG-1.4";
+
+class RmbgProcessor : public ImageProcessor {
 public:
-  RmbgProcessor();
+  RmbgProcessor(Ort::MemoryInfo &memInfo, Ort::Session *session, int gpugpuIdxIdx);
   ~RmbgProcessor() override;
 
-  liret init() override;
+  std::string_view name() const override { return g_processorName; };
 
-  liret load() override;
-
-  const char *name() override;
-
-  liret process_image(
-      const ImageInfo &inimage, ImageInfo &outimage,
-      const ProgressCallback &&procb = [](float val) { printf("%.2f\n", val); }) const override;
+  liret process_image(const ImageInfo &inimage, ImageInfo &outimage,
+                      const ProgressCallback &procb = defaultProgressCallback) const override;
 
 private:
   Ort::RunOptions runOptions;
-  Ort::Env env;
-  Ort::SessionOptions sessionOptions;
-  Ort::MemoryInfo memInfo;
-  Ort::Session *session{nullptr};
 
-  OrtCUDAProviderOptions cudaOptions;
+  Ort::MemoryInfo &memInfo;
+  Ort::Session *session;
 
-  ncnn::Pipeline *rmbg_preproc{nullptr};
   ncnn::Pipeline *rmbg_postproc{nullptr};
   ncnn::VulkanDevice *vulkanDevice{nullptr};
 
-  std::vector<uint8_t> modelBuffer;
-
   int gpuIndex;
 };
+
+class RmbgContainer : public ProcessorContainer {
+public:
+  RmbgContainer();
+  ~RmbgContainer() override;
+
+  liret init() override;
+  liret deinit() override;
+
+  ImageProcessor *tryAcquireProcessor() override;
+  void reclaimProcessor(ImageProcessor *proc) override;
+
+  std::string_view name() const override { return g_processorName; };
+
+private:
+  Ort::Env env;
+  Ort::MemoryInfo memInfo;
+
+  Ort::Session *session{nullptr};
+  Ort::SessionOptions sessionOptions;
+  OrtCUDAProviderOptions cudaOptions;
+
+  std::vector<uint8_t> modelBuffer;
+};
+
+class LIMB_API RmbgModule : public ProcessorModule {
+public:
+  ProcessorContainer *allocateContainer() override { return new RmbgContainer; }
+
+  void deallocateContainer(ProcessorContainer *proc) override { delete proc; }
+
+  std::string_view name() const override { return g_processorName; }
+};
+
 } // namespace limb
 
-extern "C" LIMB_API limb::RmbgProcessor *createProcessor();
-
-extern "C" LIMB_API void destroyProcessor(limb::ImageProcessor *processor);
-
-extern "C" LIMB_API const char *processorName();
+extern "C" LIMB_API limb::RmbgModule *GetProcessorModule();
 
 #endif // _RMBG_PROCESSOR_H_

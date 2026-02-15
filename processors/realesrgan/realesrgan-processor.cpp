@@ -42,98 +42,27 @@ static const uint32_t realesrgan_postproc_tta_int8s_spv_data[] = {
 #include "realesrgan_postproc_tta_int8s.spv.hex.h"
 };
 
-// TODO refactor processor module api
-class NcnnGpuManager {
-public:
-  void tryCreate() {
-    std::lock_guard lock(mutex);
-    if (counter == 0) {
-      // The NCNN GPU instance is unique per shared library, so each module needs to handle it manually.
-      ncnn::create_gpu_instance();
-    }
-    ++counter;
-  }
-
-  void tryDestroy() {
-    std::lock_guard lock(mutex);
-
-    if (counter == 0) {
-      return;
-    }
-    if (counter == 1) {
-      // Since this module is a separate shared library, it is safe to destroy the NCNN GPU instance,
-      // and it will not affect other modules.
-      ncnn::destroy_gpu_instance();
-    }
-    --counter;
-  }
-
-private:
-  int counter = 0;
-  std::mutex mutex;
-};
-
-static NcnnGpuManager _manager;
-
-extern "C" LIMB_API limb::RealesrganProcessor *createProcessor() { return new limb::RealesrganProcessor; }
-
-extern "C" LIMB_API void destroyProcessor(limb::ImageProcessor *processor) { delete processor; }
-
-extern "C" LIMB_API const char *processorName() { return "Real-ESRGAN"; }
+extern "C" LIMB_API limb::RealesrganModule *GetProcessorModule() { return new limb::RealesrganModule; }
 
 namespace limb {
-RealesrganProcessor::RealesrganProcessor()
-    : net(new ncnn::Net()), net_owner(true), tta_mode(false), realesrgan_preproc(nullptr), realesrgan_postproc(nullptr),
-      bicubic_2x(nullptr), bicubic_3x(nullptr), bicubic_4x(nullptr), scale(0), tilesize(0), prepadding(0) {};
 
-RealesrganProcessor::RealesrganProcessor(ncnn::Net *_net, bool _tta_mode)
-    : net(_net ? _net : new ncnn::Net()), net_owner(_net ? false : true), tta_mode(_tta_mode),
-      realesrgan_preproc(nullptr), realesrgan_postproc(nullptr), bicubic_2x(nullptr), bicubic_3x(nullptr),
-      bicubic_4x(nullptr), scale(0), tilesize(0), prepadding(0) {}
+RealesrganContainer::RealesrganContainer() : net(nullptr) {}
 
-RealesrganProcessor::~RealesrganProcessor() {
-  if (realesrgan_preproc != nullptr) {
-    delete realesrgan_preproc;
-    realesrgan_preproc = nullptr;
-  }
-
-  if (realesrgan_postproc != nullptr) {
-    delete realesrgan_postproc;
-    realesrgan_postproc = nullptr;
-  }
-
-  if (bicubic_2x != nullptr) {
-    bicubic_2x->destroy_pipeline(net->opt);
-    delete bicubic_2x;
-    bicubic_2x = nullptr;
-  }
-
-  if (bicubic_3x != nullptr) {
-    bicubic_3x->destroy_pipeline(net->opt);
-    delete bicubic_3x;
-    bicubic_3x = nullptr;
-  }
-
-  if (bicubic_4x != nullptr) {
-    bicubic_4x->destroy_pipeline(net->opt);
-    delete bicubic_4x;
-    bicubic_4x = nullptr;
-  }
-
-  if (net_owner && net != nullptr) {
-    net->clear();
+RealesrganContainer::~RealesrganContainer() {
+  if (net != nullptr) {
     delete net;
     net = nullptr;
   }
-
-  _manager.tryDestroy();
 }
 
-liret RealesrganProcessor::init() {
-  _manager.tryCreate();
-  scale = 4;
-  tilesize = 200;
-  prepadding = 10;
+liret RealesrganContainer::init() {
+  // The NCNN GPU instance is unique per shared library, so each module needs to handle it manually.
+  ncnn::create_gpu_instance();
+
+  net = new ncnn::Net;
+  if (!net) {
+    return liret::kAborted;
+  }
 
   net->opt.use_vulkan_compute = true;
   net->opt.use_fp16_packed = true;
@@ -148,10 +77,12 @@ liret RealesrganProcessor::init() {
 
   if (net->load_param(paramfullpath) != 0) {
     fprintf(stderr, "failed to load param: %s\n", paramfullpath);
+    deinit();
     return liret::kAborted;
   }
 
   if (net->load_model(modelfullpath) != 0) {
+    deinit();
     fprintf(stderr, "failed to load model: %s\n", modelfullpath);
     return liret::kAborted;
   }
@@ -159,11 +90,33 @@ liret RealesrganProcessor::init() {
   return liret::kOk;
 }
 
-const char *RealesrganProcessor::name() { return processorName(); }
+liret RealesrganContainer::deinit() {
+  if (net != nullptr) {
+    delete net;
+    net = nullptr;
+  }
 
-liret RealesrganProcessor::load() {
-  int ret = 0;
+  // Since this module is a separate shared library, it is safe to destroy the NCNN GPU instance,
+  // and it will not affect other modules.
+  ncnn::destroy_gpu_instance();
+  return liret::kOk;
+}
 
+ImageProcessor *RealesrganContainer::tryAcquireProcessor() {
+  const bool tta_enabled = false;
+
+  if (!net) {
+    return nullptr;
+  }
+
+  return new RealesrganProcessor(net, tta_enabled);
+}
+
+void RealesrganContainer::reclaimProcessor(ImageProcessor *proc) { delete proc; }
+
+RealesrganProcessor::RealesrganProcessor(const ncnn::Net *_net, bool _tta_mode)
+    : net(_net), tta_mode(_tta_mode), realesrgan_preproc(nullptr), realesrgan_postproc(nullptr), bicubic_2x(nullptr),
+      bicubic_3x(nullptr), bicubic_4x(nullptr), scale(4), tilesize(200), prepadding(10) {
   // initialize preprocess and postprocess pipeline
   {
     std::vector<ncnn::vk_specialization_type> specializations(1);
@@ -179,6 +132,7 @@ liret RealesrganProcessor::load() {
     realesrgan_postproc = new ncnn::Pipeline(net->vulkan_device());
     // Related to vkCmdDispath groupCountX/Y/Z
     realesrgan_postproc->set_optimal_local_size_xyz(32, 32, 3);
+
     // Load specific shader program to pipelines.
     // Shaders are cahced in net!
     if (tta_mode) {
@@ -260,12 +214,40 @@ liret RealesrganProcessor::load() {
 
     bicubic_4x->create_pipeline(net->opt);
   }
+}
 
-  return liret::kOk;
+RealesrganProcessor::~RealesrganProcessor() {
+  if (realesrgan_preproc != nullptr) {
+    delete realesrgan_preproc;
+    realesrgan_preproc = nullptr;
+  }
+
+  if (realesrgan_postproc != nullptr) {
+    delete realesrgan_postproc;
+    realesrgan_postproc = nullptr;
+  }
+
+  if (bicubic_2x != nullptr) {
+    bicubic_2x->destroy_pipeline(net->opt);
+    delete bicubic_2x;
+    bicubic_2x = nullptr;
+  }
+
+  if (bicubic_3x != nullptr) {
+    bicubic_3x->destroy_pipeline(net->opt);
+    delete bicubic_3x;
+    bicubic_3x = nullptr;
+  }
+
+  if (bicubic_4x != nullptr) {
+    bicubic_4x->destroy_pipeline(net->opt);
+    delete bicubic_4x;
+    bicubic_4x = nullptr;
+  }
 }
 
 liret RealesrganProcessor::process_image(const ImageInfo &inimage, ImageInfo &outimage,
-                                         const ProgressCallback &&procb) const {
+                                         const ProgressCallback &procb) const {
   // TODO: check does inmat is really nessesary
   ncnn::Mat inmat(inimage.w, inimage.h, (void *)inimage.data, (size_t)inimage.c, inimage.c);
 

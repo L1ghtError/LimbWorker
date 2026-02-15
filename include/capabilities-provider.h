@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include "utils/status.h"
 
@@ -16,7 +17,7 @@ public:
   CapabilitiesProvider(CapabilitiesProvider &&cp);
 
   // Add a processor so the capabilities provider will report that we are capable of using it
-  liret addAvailableProcessor(std::string name, uint32_t index);
+  liret addAvailableProcessor(std::string_view name, uint32_t index);
 
   liret removeAvailableProcessor(uint32_t index);
 

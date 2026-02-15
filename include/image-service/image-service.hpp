@@ -1,6 +1,6 @@
 #ifndef _IMAGE_SERVICE_HPP_
 #define _IMAGE_SERVICE_HPP_
-#include "image-processor.h"
+#include "processor-module.h"
 
 #include <cstdint>
 #include <memory>
@@ -49,10 +49,16 @@ public:
     std::unique_ptr<uint8_t[], decltype(stbiDeleter)> inPixel(
         stbi_load_from_memory(inImageData.get(), size, &w, &h, &c, 0), stbiDeleter);
 
-    ImageProcessor *processor;
-    ret = getProcessor(input.modelId, &processor);
+    ProcessorContainer *container;
+    ret = getContainer(input.modelId, &container);
     if (ret != liret::kOk) {
       return ret;
+    }
+
+    auto procDeleter = [container](ImageProcessor *ptr) { container->reclaimProcessor(ptr); };
+    std::unique_ptr<ImageProcessor, decltype(procDeleter)> processor(container->tryAcquireProcessor(), procDeleter);
+    if (!processor) {
+      return liret::kAborted;
     }
 
     ImageInfo inImageInfo{.data = inPixel.get(), .w = w, .h = h, .c = c};
@@ -71,41 +77,41 @@ public:
     return m_mediaRepo.updateImageById(input.imageId.c_str(), input.imageId.size(), outImage.get(), outSize);
   }
 
-  virtual size_t processorCount() { return m_processors.size(); }
+  virtual size_t processorCount() { return m_containers.size(); }
 
-  virtual liret getProcessor(size_t index, ImageProcessor **processor) {
-    if (index >= m_processors.size() || m_processors[index] == nullptr) {
+  virtual liret getContainer(size_t index, ProcessorContainer **container) {
+    if (index >= m_containers.size() || m_containers[index] == nullptr) {
       return liret::kNotFound;
     }
-    *processor = m_processors[index];
+    *container = m_containers[index];
 
     return liret::kOk;
   }
 
-  virtual liret addProcessor(size_t index, ImageProcessor *processor) {
-    if (processor == nullptr) {
+  virtual liret addContainer(size_t index, ProcessorContainer *container) {
+    if (container == nullptr) {
       return liret::kInvalidInput;
     }
-    if (m_processors.size() < index + 1) {
-      m_processors.resize(index + 1);
+    if (m_containers.size() < index + 1) {
+      m_containers.resize(index + 1);
     }
-    m_processors[index] = processor;
+    m_containers[index] = container;
 
     return liret::kOk;
   }
 
-  virtual bool removeProcessor(size_t index) {
-    if (index >= m_processors.size() || m_processors[index] == nullptr) {
+  virtual bool removeContainer(size_t index) {
+    if (index >= m_containers.size() || m_containers[index] == nullptr) {
       return false;
     }
-    m_processors[index] = nullptr;
+    m_containers[index] = nullptr;
     return true;
   }
 
-  virtual void clear() { m_processors.clear(); }
+  virtual void clear() { m_containers.clear(); }
 
 private:
-  std::vector<ImageProcessor *> m_processors;
+  std::vector<ProcessorContainer *> m_containers;
   Repo m_mediaRepo;
 };
 } // namespace limb

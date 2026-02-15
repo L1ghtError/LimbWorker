@@ -1,20 +1,22 @@
 #include "loopback/loopback.h"
 
-extern "C" LIMB_API limb::LoopbackProcessor *createProcessor() { return new limb::LoopbackProcessor; }
-
-extern "C" LIMB_API void destroyProcessor(limb::ImageProcessor *processor) { delete processor; }
-
-extern "C" LIMB_API const char *processorName() { return "Loopback-Processor"; }
+extern "C" LIMB_API limb::LoopbackModule *createProcessor() { return new limb::LoopbackModule; }
 
 namespace limb {
+LoopbackContainer::LoopbackContainer() {};
+LoopbackContainer::~LoopbackContainer() {};
+
+liret LoopbackContainer::init() { return liret::kOk; }
+liret LoopbackContainer::deinit() { return liret::kOk; }
+
+void LoopbackContainer::reclaimProcessor(ImageProcessor *proc) { delete proc; }
+ImageProcessor *LoopbackContainer::tryAcquireProcessor() { return new LoopbackProcessor; }
+
 LoopbackProcessor::LoopbackProcessor() {};
 LoopbackProcessor::~LoopbackProcessor() {};
 
-liret LoopbackProcessor::init() { return liret::kOk; }
-liret LoopbackProcessor::load() { return liret::kOk; }
-const char *LoopbackProcessor::name() { return processorName(); }
 liret LoopbackProcessor::process_image(const ImageInfo &inimage, ImageInfo &outimage,
-                                       const ProgressCallback &&procb) const {
+                                       const ProgressCallback &procb) const {
   // Simple copy from input to output
   outimage.w = inimage.w;
   outimage.h = inimage.h;

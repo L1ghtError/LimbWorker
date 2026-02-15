@@ -5,48 +5,10 @@
 
 #include <fstream>
 #include <mutex>
-/*
-static const uint32_t rmbg_preproc_spv_data[] = {
-#include "rmbg_preproc.spv.hex.h"
-};
-*/
 
 static const uint32_t rmbg_postproc_spv_data[] = {
 #include "rmbg_postproc.spv.hex.h"
 };
-
-// TODO refactor processor module api
-class NcnnGpuManager {
-public:
-  void tryCreate() {
-    std::lock_guard lock(mutex);
-    if (counter == 0) {
-      // The NCNN GPU instance is unique per shared library, so each module needs to handle it manually.
-      ncnn::create_gpu_instance();
-    }
-    ++counter;
-  }
-
-  void tryDestroy() {
-    std::lock_guard lock(mutex);
-
-    if (counter == 0) {
-      return;
-    }
-    if (counter == 1) {
-      // Since this module is a separate shared library, it is safe to destroy the NCNN GPU instance,
-      // and it will not affect other modules.
-      ncnn::destroy_gpu_instance();
-    }
-    --counter;
-  }
-
-private:
-  int counter = 0;
-  std::mutex mutex;
-};
-
-static NcnnGpuManager _manager;
 
 constexpr const char *kModelPath = "../models/RMBG-1.4/onnx/model.onnx";
 
@@ -54,11 +16,7 @@ constexpr int kTargetHeight = 1024;
 constexpr int kTargetWidth = 1024;
 constexpr auto cudaEPName = "CUDAExecutionProvider";
 
-extern "C" LIMB_API limb::RmbgProcessor *createProcessor() { return new limb::RmbgProcessor; }
-
-extern "C" LIMB_API void destroyProcessor(limb::ImageProcessor *processor) { delete processor; }
-
-extern "C" LIMB_API const char *processorName() { return "RMBG-1.4"; }
+extern "C" LIMB_API limb::RmbgModule *GetProcessorModule() { return new limb::RmbgModule; }
 
 namespace {
 inline liret loadFile(const char *path, std::vector<uint8_t> &buffer) {
@@ -101,30 +59,21 @@ bool cudaSuppored() {
 } // namespace
 
 namespace limb {
-RmbgProcessor::RmbgProcessor()
-    : env(ORT_LOGGING_LEVEL_WARNING, "RMBG_1_4"),
+RmbgContainer::RmbgContainer()
+    : env(ORT_LOGGING_LEVEL_WARNING, g_processorName),
       memInfo(Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeCPU)) {}
-RmbgProcessor::~RmbgProcessor() {
 
-  if (vulkanDevice) {
-    delete vulkanDevice;
-    vulkanDevice = nullptr;
-  }
-
-  if (rmbg_postproc) {
-    delete rmbg_postproc;
-    rmbg_postproc = nullptr;
-  }
-
+RmbgContainer::~RmbgContainer() {
   if (session) {
     delete session;
     session = nullptr;
   }
-  _manager.tryDestroy();
-};
+}
 
-liret RmbgProcessor::init() {
-  _manager.tryCreate();
+liret RmbgContainer::init() {
+  // The NCNN GPU instance is unique per shared library, so each module needs to handle it manually.
+  ncnn::create_gpu_instance();
+
   sessionOptions.SetLogSeverityLevel(ORT_LOGGING_LEVEL_WARNING);
 
   if (cudaSuppored()) {
@@ -138,9 +87,8 @@ liret RmbgProcessor::init() {
 
   sessionOptions.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
 
-  gpuIndex = ncnn::get_default_gpu_index();
-
   if (loadFile(kModelPath, modelBuffer) != liret::kOk) {
+    deinit();
     return liret::kNotFound;
   }
 
@@ -149,24 +97,57 @@ liret RmbgProcessor::init() {
   return liret::kOk;
 }
 
-liret RmbgProcessor::load() {
+liret RmbgContainer::deinit() {
+  if (session) {
+    delete session;
+    session = nullptr;
+  }
+  modelBuffer.clear();
+
+  sessionOptions = Ort::SessionOptions();
+
+  // Since this module is a separate shared library, it is safe to destroy the NCNN GPU instance,
+  // and it will not affect other modules.
+  ncnn::destroy_gpu_instance();
+  return liret::kOk;
+}
+
+ImageProcessor *RmbgContainer::tryAcquireProcessor() {
+  const int gpuIndex = ncnn::get_default_gpu_index();
+
+  if (!session) {
+    return nullptr;
+  }
+
+  return new RmbgProcessor(memInfo, session, gpuIndex);
+}
+
+void RmbgContainer::reclaimProcessor(ImageProcessor *proc) { delete proc; }
+
+RmbgProcessor::RmbgProcessor(Ort::MemoryInfo &memInfo, Ort::Session *session, int gpuIndex)
+    : memInfo(memInfo), session(session), gpuIndex(gpuIndex) {
   std::vector<ncnn::vk_specialization_type> specializations(0);
 
-  // TODO: Verify that pipeline frees device on destruction
-  // if not, we need to manage device lifetime
   vulkanDevice = new ncnn::VulkanDevice(gpuIndex);
 
   rmbg_postproc = new ncnn::Pipeline(vulkanDevice);
   rmbg_postproc->set_optimal_local_size_xyz(32, 32, 3);
   rmbg_postproc->create(rmbg_postproc_spv_data, sizeof(rmbg_postproc_spv_data), specializations);
-
-  return liret::kOk;
 }
 
-const char *RmbgProcessor::name() { return processorName(); }
+RmbgProcessor::~RmbgProcessor() {
+  if (vulkanDevice) {
+    delete vulkanDevice;
+    vulkanDevice = nullptr;
+  }
 
-liret RmbgProcessor::process_image(const ImageInfo &inimage, ImageInfo &outimage,
-                                   const ProgressCallback &&procb) const {
+  if (rmbg_postproc) {
+    delete rmbg_postproc;
+    rmbg_postproc = nullptr;
+  }
+};
+
+liret RmbgProcessor::process_image(const ImageInfo &inimage, ImageInfo &outimage, const ProgressCallback &procb) const {
   outimage.data = nullptr;
   outimage.w = inimage.w;
   outimage.h = inimage.h;
@@ -225,7 +206,6 @@ liret RmbgProcessor::process_image(const ImageInfo &inimage, ImageInfo &outimage
   Ort::Value outputTensor;
 
   try {
-    Ort::RunOptions runOptions;
     std::vector<std::string> providers = Ort::GetAvailableProviders();
 
     const char *input_names[] = {"input"};

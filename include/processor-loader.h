@@ -3,9 +3,10 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
-#include "image-processor.h"
+#include "processor-module.h"
 #include "utils/status.h"
 
 namespace limb {
@@ -22,9 +23,9 @@ public:
   liret addLoadDir(const std::string &dirPath);
   liret removeLoadDir(size_t index);
 
-  std::string processorName(size_t index);
-  ImageProcessor *allocateProcessor(size_t index);
-  void destroyProcessor(ImageProcessor *processor);
+  std::string_view processorName(size_t index);
+  ProcessorContainer *allocateContainer(size_t index);
+  void destroyContainer(ProcessorContainer *container);
 
   size_t processorCount() const;
   size_t dirCount() const;

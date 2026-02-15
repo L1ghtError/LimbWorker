@@ -22,7 +22,7 @@ public:
   virtual liret getCapabilitiesJSON(uint8_t *, size_t &) = 0;
 
   virtual size_t processorCount() const = 0;
-  virtual std::string processorName(size_t index) = 0;
+  virtual std::string_view processorName(size_t index) = 0;
 };
 
 template <class MediaService, class Loader = ProcessorLoader, class CapProvider = CapabilitiesProvider>
@@ -40,35 +40,35 @@ public:
     std::lock_guard<CapProvider> lock(m_capProvider);
 
     const size_t pc = m_processorLoader.processorCount();
-    auto loaderDeleter = [this](ImageProcessor *ptr) { this->m_processorLoader.destroyProcessor(ptr); };
+    auto loaderDeleter = [this](ProcessorContainer *ptr) {
+      ptr->deinit();
+      this->m_processorLoader.destroyContainer(ptr);
+    };
 
     for (size_t i = 0; i < pc; i++) {
-      std::unique_ptr<ImageProcessor, decltype(loaderDeleter)> p(m_processorLoader.allocateProcessor(i), loaderDeleter);
-      if (!p) {
+      std::unique_ptr<ProcessorContainer, decltype(loaderDeleter)> container(m_processorLoader.allocateContainer(i),
+                                                                             loaderDeleter);
+      if (!container) {
         return liret::kInvalidInput;
       }
 
       // TODO: add lazy load, and add unload on idle
-      err = p->init();
-      if (err != liret::kOk) {
-        return err;
-      }
-      err = p->load();
+      err = container->init();
       if (err != liret::kOk) {
         return err;
       }
 
-      err = m_mediaService.addProcessor(i, p.get());
+      err = m_mediaService.addContainer(i, container.get());
       if (err != liret::kOk) {
         return err;
       }
 
       m_capProvider.addAvailableProcessor(m_processorLoader.processorName(i), i);
       if (err != liret::kOk) {
-        m_mediaService.removeProcessor(i);
+        m_mediaService.removeContainer(i);
         return err;
       }
-      p.release();
+      container.release();
     }
     return err;
   }
@@ -78,9 +78,10 @@ public:
     const size_t pc = m_mediaService.processorCount();
 
     for (int i = 0; i < pc; i++) {
-      ImageProcessor *p;
-      if (m_mediaService.getProcessor(i, &p) == liret::kOk) {
-        m_processorLoader.destroyProcessor(p);
+      ProcessorContainer *container;
+      if (m_mediaService.getContainer(i, &container) == liret::kOk) {
+        container->deinit();
+        m_processorLoader.destroyContainer(container);
       }
     }
     m_capProvider.clear();
@@ -96,7 +97,7 @@ public:
   }
 
   size_t processorCount() const override { return m_processorLoader.processorCount(); }
-  std::string processorName(size_t index) override { return m_processorLoader.processorName(index); }
+  std::string_view processorName(size_t index) override { return m_processorLoader.processorName(index); }
 
   // private:
   MediaService m_mediaService;
