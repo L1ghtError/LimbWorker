@@ -127,7 +127,7 @@ if(NOT USE_SYSTEM_MONGO_C_DRIVER)
     if(NOT EXISTS "${ABSOLUTE_MONGO_C_DRIVER_ROOTDIR}/CMakeLists.txt")
         message(FATAL_ERROR "${ABSOLUTE_MONGO_C_DRIVER_ROOTDIR}/CMakeLists.txt The submodules were not downloaded! Please update submodules with \"git submodule update --init --recursive\" and try again.")
     endif()
-    option(MONGOC_ENABLE_MONGODB_AWS_AUTH "" OFF)
+    option(ENABLE_MONGODB_AWS_AUTH "" OFF)
     add_subdirectory("${MONGO_C_DRIVER_ROOTDIR}")
 endif()
 
