@@ -52,7 +52,7 @@ struct AmqpHandlerImpl {
         conf(_conf) {
 
     if (conf == nullptr) {
-      static const limb::AmqpConfig defaultConf = {60};
+      static const limb::AmqpConfig defaultConf{.heartbeat = 60};
       conf = &defaultConf;
     }
   }
