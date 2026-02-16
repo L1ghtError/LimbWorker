@@ -46,13 +46,13 @@ private:
 };
 
 struct AmqpHandlerImpl {
-  AmqpHandlerImpl(const AmqpConfig *_conf = nullptr)
+  AmqpHandlerImpl(const limb::AmqpConfig *_conf = nullptr)
       : connected(false), connection(nullptr), quit(false), keepAlive(true), inputBuffer(AmqpHandler::BUFFER_SIZE),
         outBuffer(AmqpHandler::BUFFER_SIZE), tmpBuff(AmqpHandler::TEMP_BUFFER_SIZE), sock(abnet::invalid_socket),
         conf(_conf) {
 
     if (conf == nullptr) {
-      static const AmqpConfig defaultConf = {60};
+      static const limb::AmqpConfig defaultConf = {60};
       conf = &defaultConf;
     }
   }
@@ -63,7 +63,7 @@ struct AmqpHandlerImpl {
   AMQP::Connection *connection;
   std::vector<char> tmpBuff;
 
-  const AmqpConfig *conf;
+  const limb::AmqpConfig *conf;
 
   std::atomic<bool> quit;
   std::atomic<std::chrono::high_resolution_clock::time_point> lastMessage;
@@ -79,7 +79,8 @@ struct AmqpHandlerImpl {
   bool connected;
 };
 
-AmqpHandler::AmqpHandler(const char *host, uint16_t port, const AmqpConfig *conf) : m_impl(new AmqpHandlerImpl(conf)) {
+AmqpHandler::AmqpHandler(const char *host, uint16_t port, const limb::AmqpConfig *conf)
+    : m_impl(new AmqpHandlerImpl(conf)) {
   int err = 0;
   abnet::error_code ec;
   do {

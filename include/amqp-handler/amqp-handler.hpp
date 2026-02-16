@@ -2,9 +2,7 @@
 #define _AMQP_HANDLER_HPP_
 #include <amqpcpp.h>
 
-struct AmqpConfig {
-  uint16_t heartbeat;
-};
+#include "app-config.h"
 
 struct AmqpHandlerImpl;
 class AmqpHandler : public AMQP::ConnectionHandler {
@@ -12,7 +10,7 @@ public:
   static constexpr size_t BUFFER_SIZE = 8 * 1024 * 1024;  // 8Mb
   static constexpr size_t TEMP_BUFFER_SIZE = 1024 * 1024; // 1Mb
 
-  AmqpHandler(const char *host, uint16_t port, const AmqpConfig *conf = nullptr);
+  AmqpHandler(const char *host, uint16_t port, const limb::AmqpConfig *conf = nullptr);
   virtual ~AmqpHandler();
 
   void loop();

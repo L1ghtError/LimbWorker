@@ -118,6 +118,7 @@ if(NOT USE_SYSTEM_SIMDJSON)
     if(NOT EXISTS "${ABSOLUTE_SIMDJSON_ROOTDIR}/CMakeLists.txt")
         message(FATAL_ERROR "${ABSOLUTE_SIMDJSON_ROOTDIR}/CMakeLists.txt The submodules were not downloaded! Please update submodules with \"git submodule update --init --recursive\" and try again.")
     endif()
+    option(SIMDJSON_DISABLE_DEPRECATED_API "" ON)
     add_subdirectory("${SIMDJSON_ROOTDIR}")
 endif()
 

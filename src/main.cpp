@@ -11,6 +11,7 @@
 #include "amqp-handler/amqp-handler.hpp"
 #include "amqp-router/amqp-router.hpp"
 
+#include "app-config.h"
 #include "capabilities-provider.h"
 #include "image-service/image-service.hpp"
 #include "limb-app.h"
@@ -22,14 +23,22 @@
 int main(int argc, char **argv) {
   liret err = liret::kOk;
 
+  limb::ConfigFactory configF(argc, argv);
+  limb::AppConfig config;
+  err = configF.getConfig(config);
+  if (err != liret::kOk) {
+    printf("failed to initialize config %s", listat::getErrorMessage(err));
+    return EXIT_FAILURE;
+  }
+
   bson_error_t error = {0};
-  const char *uriString = "mongodb://192.168.31.33:8005/?appname=client-example";
-  const char *dbString = "LimbDB";
-  limb::MongoClient repo(uriString, dbString);
+  const char *uriString = config.dbConfig.uri.c_str();
+  const char *dbName = config.dbConfig.dbName.c_str();
+  limb::MongoClient repo(uriString, dbName);
 
   err = repo.init(&error);
   if (err != liret::kOk) {
-    fprintf(stderr, "failed to initialize Mongo client: %s %s, %s\n", uriString, dbString, error.message);
+    fprintf(stderr, "failed to initialize Mongo client: %s %s, %s\n", uriString, dbName, error.message);
     return EXIT_FAILURE;
   }
 
@@ -42,11 +51,10 @@ int main(int argc, char **argv) {
   application.init();
 
   // AMQP preprocess
-  AmqpConfig amqpConf;
-  amqpConf.heartbeat = 60;
-  AmqpHandler handler("192.168.88.250", 5672, &amqpConf);
-  AMQP::Connection connection(&handler, AMQP::Login("test", "test"), "/");
+  AmqpHandler handler(config.transportConfig.host.c_str(), config.transportConfig.port, &config.transportConfig);
+  AMQP::Connection connection(&handler, AMQP::Login(config.transportConfig.user, config.transportConfig.passwd), "/");
   AMQP::Channel ch(&connection);
+
   // Thread pool preprocess
   uint32_t thdCount = ncnn::get_gpu_info(ncnn::get_default_gpu_index()).compute_queue_count();
   // TODO: set right maximum available thread count with chunk size
@@ -58,10 +66,10 @@ int main(int argc, char **argv) {
   limb::tp::ThreadPool tp(tpOptions);
   // Initialise routes
   ch.setQos(thdCount);
-  liret ret = setRoutes(&application, tp, connection, ch);
-  if (ret != liret::kOk) {
-    printf("%s", listat::getErrorMessage(ret));
-    return (int)ret;
+  err = setRoutes(&application, tp, connection, ch);
+  if (err != liret::kOk) {
+    printf("%s", listat::getErrorMessage(err));
+    return (int)err;
   }
   std::cout << " [x] Awaiting RPC requests" << std::endl;
 
