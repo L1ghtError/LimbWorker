@@ -8,8 +8,8 @@
 // TODO remove ncnn dependency
 #include <gpu.h>
 
-#include "amqp-handler/amqp-handler.hpp"
-#include "amqp-router/amqp-router.hpp"
+#include "app-transport/amqp-handler.hpp"
+#include "app-transport/amqp-transport.hpp"
 
 #include "app-config.h"
 #include "capabilities-provider.h"
