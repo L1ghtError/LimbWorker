@@ -82,6 +82,28 @@ foreach(cfg ${CMAKE_CONFIGURATION_TYPES})
     endforeach()
 endfunction()
 
+function(add_hardlink_to_build FILE_NAME)
+    # Source and destination paths
+    set(SRC_FILE ${CMAKE_SOURCE_DIR}/${FILE_NAME})
+    set(DST_FILE ${CMAKE_BINARY_DIR}/${FILE_NAME})
+
+    # Create a safe target name (replace dots/slashes)
+    string(REPLACE "." "_" TARGET_NAME ${FILE_NAME})
+    string(REPLACE "/" "_" TARGET_NAME ${TARGET_NAME})
+
+    add_custom_command(
+        OUTPUT ${DST_FILE}
+        COMMAND ${CMAKE_COMMAND} -E create_hardlink ${SRC_FILE} ${DST_FILE}
+        DEPENDS ${SRC_FILE}
+        COMMENT "Creating hard link for ${FILE_NAME}"
+        VERBATIM
+    )
+
+    add_custom_target(link_${TARGET_NAME} ALL
+        DEPENDS ${DST_FILE}
+    )
+endfunction()
+
 # Flags
 add_definitions(-DNOMINMAX)
 # Options
@@ -303,6 +325,7 @@ endif()
 
     add_executable(limb_app "src/main.cpp")
     set_target_output_dirs(limb_app "${CMAKE_CURRENT_BINARY_DIR}")
+    add_hardlink_to_build("config.json")
     # Link libraries
     target_link_libraries(limb_app PRIVATE limb_internal)
 
