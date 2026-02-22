@@ -1,0 +1,11 @@
+repos:
+  - repo: local
+    hooks:
+      - id: clang-format
+        verbose: false
+        name: clang-format
+        entry: clang-format -i
+        args: ["-fallback-style=none"]
+        language: system
+        types_or: [c, c++]
+        files: ^(include|src)/.*\.(c|cpp|h|hpp)$
