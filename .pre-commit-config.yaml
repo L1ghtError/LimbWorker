@@ -8,4 +8,4 @@ repos:
         args: ["-fallback-style=none"]
         language: system
         types_or: [c, c++]
-        files: ^(include|src)/.*\.(c|cpp|h|hpp)$
+        files: ^(include|src|processors|tests)/.*\.(c|cpp|h|hpp)$
