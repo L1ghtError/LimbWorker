@@ -8,8 +8,7 @@
 // TODO remove ncnn dependency
 #include <gpu.h>
 
-#include "amqp-handler/amqp-handler.hpp"
-#include "amqp-router/amqp-router.hpp"
+#include "app-transport/amqp-transport.hpp"
 
 #include "app-config.h"
 #include "capabilities-provider.h"
@@ -48,30 +47,31 @@ int main(int argc, char **argv) {
 
   limb::App<limb::ImageService<limb::MongoClient &> &, limb::ProcessorLoader &, limb::CapabilitiesProvider &>
       application(imageService, loader, capProvider);
-  application.init();
 
-  // AMQP preprocess
-  AmqpHandler handler(config.transportConfig.host.c_str(), config.transportConfig.port, &config.transportConfig);
-  AMQP::Connection connection(&handler, AMQP::Login(config.transportConfig.user, config.transportConfig.passwd), "/");
-  AMQP::Channel ch(&connection);
-
-  // Thread pool preprocess
-  uint32_t thdCount = ncnn::get_gpu_info(ncnn::get_default_gpu_index()).compute_queue_count();
-  // TODO: set right maximum available thread count with chunk size
-  thdCount = thdCount > 3 ? 3 : thdCount;
-  limb::tp::ThreadPoolOptions tpOptions;
-
-  tpOptions.setThreadCount(thdCount);
-  tpOptions.setQueueSize(nextPowerOfTwo(thdCount));
-  limb::tp::ThreadPool tp(tpOptions);
-  // Initialise routes
-  ch.setQos(thdCount);
-  err = setRoutes(&application, tp, connection, ch);
-  if (err != liret::kOk) {
-    printf("%s", listat::getErrorMessage(err));
-    return (int)err;
+  if (application.init() != liret::kOk) {
+    fprintf(stderr, "failed to initialize application\n");
+    return EXIT_FAILURE;
   }
-  std::cout << " [x] Awaiting RPC requests" << std::endl;
+
+  const int queueCount = ncnn::get_gpu_info(ncnn::get_default_gpu_index()).compute_queue_count();
+  const int thdCount = std::thread::hardware_concurrency();
+
+  limb::tp::ThreadPoolOptions options;
+  options.setThreadCount(std::min(queueCount, thdCount));
+  options.setQueueSize(nextPowerOfTwo(thdCount));
+
+  limb::AmqpTransportAdapter transport(config.transportConfig, options);
+  if (transport.init(&application) != liret::kOk) {
+    fprintf(stderr, "failed to amqp transport\n");
+    return EXIT_FAILURE;
+  }
+
+  fprintf(stdout, "[x] Awaiting RPC requests\n");
+
+  if (transport.loop() != liret::kOk) {
+    fprintf(stderr, "failed to start amqp transport loop\n");
+    return EXIT_FAILURE;
+  }
 
   // For some reason windwos SIGTERM produces thousands of memory leak
   // Seems like on windows it better aproach
@@ -79,9 +79,8 @@ int main(int argc, char **argv) {
   //   std::this_thread::sleep_for(std::chrono::milliseconds(200));
   //   handler.quit();
   // });
-
-  handler.loop();
   // thd.join();
+
   if (ncnn::get_gpu_instance())
     ncnn::destroy_gpu_instance();
 

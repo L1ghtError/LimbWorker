@@ -7,17 +7,13 @@
 #include <utility>
 #include <vector>
 
-#include "utils/status.h"
-
+#include "app-tasks/task-types.hpp"
 #include "media-repository/media-repository.hpp"
 
+#include "utils/status.h"
 #include "utils/stb-wrap.h"
 
 namespace limb {
-struct ImageTask {
-  uint32_t modelId;
-  std::string imageId;
-};
 
 template <class Repo>
   requires std::derived_from<std::remove_cvref_t<Repo>, MediaRepository>

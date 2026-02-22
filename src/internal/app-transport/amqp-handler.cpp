@@ -1,4 +1,4 @@
-#include "amqp-handler/amqp-handler.hpp"
+#include "app-transport/amqp-handler.hpp"
 
 #include <atomic>
 #include <chrono>
@@ -129,7 +129,6 @@ void AmqpHandler::loop() {
   abnet::error_code ec;
 
   while (!m_impl->quit) {
-
     poll_res = abnet::socket_ops::poll_read(m_impl->sock, 0, 10000, ec);
     if (poll_res == abnet::socket_error_retval) {
       abnet::socket_ops::get_last_error(ec, 0);
@@ -241,6 +240,7 @@ void AmqpHandler::onError(AMQP::Connection *connection, const char *message) { p
 
 void AmqpHandler::onClosed(AMQP::Connection *connection) {
   printf("AMQP closed connection\n");
+  m_impl->connection = nullptr;
   m_impl->quit = true;
 }
 

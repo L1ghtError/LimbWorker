@@ -24,6 +24,7 @@ enum class ReturnStatus : int {
   kInvalidInput = 7,
   kIncomplete = 8,
   kBufferTooSmall = 9,
+  kOutOfMemory = 10,
 };
 
 class StatusManager {

@@ -1,0 +1,20 @@
+{
+  "application": {
+    "database": {
+        "type": "mongo",
+        "uri": "mongodb://192.168.88.244:8005/?appname=client-example",
+        "dbName": "LimbDB"
+    },
+    "transport": {
+        "type": "amqp",
+        "user": "test",
+        "passwd": "test",
+        "host": "192.168.88.244",
+        "port": 5672
+    }
+    
+  },
+  "processorModules": {
+    "customScanDirectories": []
+  }
+}
