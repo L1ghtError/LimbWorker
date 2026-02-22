@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "utils/status.h"
 
@@ -15,6 +16,16 @@ struct ImageTask {
 
 struct PingTask {
   std::string message;
+};
+
+struct AppInfoTask {
+  struct AvailableProcessor {
+    std::string name;
+    uint32_t index;
+  };
+
+  std::vector<AvailableProcessor> availableProcessors;
+  uint32_t totalCpuThreads;
 };
 
 } // namespace limb

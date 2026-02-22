@@ -14,7 +14,9 @@ public:
   liret parse(const uint8_t *data, size_t size, ImageTask &task) override;
 
   liret parse(const uint8_t *data, size_t size, PingTask &task) override;
-  liret serialize(std::vector<uint8_t>& data, PingTask &task) override;
+  liret serialize(std::vector<uint8_t> &data, PingTask &task) override;
+
+  liret serialize(std::vector<uint8_t> &data, AppInfoTask &task) override;
 
 private:
   simdjson::dom::parser m_parser;

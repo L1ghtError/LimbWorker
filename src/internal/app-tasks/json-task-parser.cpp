@@ -60,4 +60,37 @@ liret JsonTaskParser::serialize(std::vector<uint8_t> &data, PingTask &task) {
   return liret::kOk;
 }
 
+liret JsonTaskParser::serialize(std::vector<uint8_t> &data, AppInfoTask &task) {
+  std::lock_guard<std::mutex> lock(m_builderMutex);
+
+  m_builder.clear();
+  m_builder.start_object();
+  m_builder.append_key_value("totalCpuThreads", task.totalCpuThreads);
+  m_builder.append_comma();
+
+  m_builder.escape_and_append_with_quotes("availableProcessors");
+  m_builder.append_colon();
+  m_builder.start_array();
+  for (size_t i = 0; i < task.availableProcessors.size(); ++i) {
+    m_builder.start_object();
+    m_builder.append_key_value("index", task.availableProcessors[i].index);
+    m_builder.append_comma();
+    m_builder.append_key_value("name", task.availableProcessors[i].name);
+    m_builder.append_comma();
+    m_builder.end_object();
+
+    if (i < task.availableProcessors.size() - 1) {
+      m_builder.append_comma();
+    }
+  }
+  m_builder.end_array();
+
+  m_builder.end_object();
+
+  data.resize(m_builder.size());
+
+  std::memcpy(reinterpret_cast<void *>(data.data()), m_builder.c_str().value(), m_builder.size());
+  return liret::kOk;
+}
+
 } // namespace limb

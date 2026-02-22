@@ -19,7 +19,7 @@ public:
   virtual liret init() = 0;
   virtual void deinit() = 0;
   virtual liret processImage(const ImageTask &, const ProgressCallback && = [](float val) {}) = 0;
-  virtual liret getCapabilitiesJSON(uint8_t *, size_t &) = 0;
+  virtual AppInfoTask getAppInfo() = 0;
 
   virtual size_t processorCount() const = 0;
   virtual std::string_view processorName(size_t index) = 0;
@@ -37,7 +37,6 @@ public:
 
   liret init() override {
     liret err = liret::kOk;
-    std::lock_guard<CapProvider> lock(m_capProvider);
 
     const size_t pc = m_processorLoader.processorCount();
     auto loaderDeleter = [this](ProcessorContainer *ptr) {
@@ -74,7 +73,6 @@ public:
   }
 
   void deinit() override {
-    std::lock_guard<CapProvider> lock(m_capProvider);
     const size_t pc = m_mediaService.processorCount();
 
     for (int i = 0; i < pc; i++) {
@@ -92,9 +90,7 @@ public:
     return m_mediaService.processImage(input, ProgressCallback(procb));
   }
 
-  liret getCapabilitiesJSON(uint8_t *buf, size_t &size) override {
-    return m_capProvider.getCapabilitiesJSON(buf, size);
-  }
+  AppInfoTask getAppInfo() override { return m_capProvider.getAppInfo(); }
 
   size_t processorCount() const override { return m_processorLoader.processorCount(); }
   std::string_view processorName(size_t index) override { return m_processorLoader.processorName(index); }

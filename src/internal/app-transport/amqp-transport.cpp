@@ -143,13 +143,20 @@ void AmqpTransportAdapter::handlePing(const AMQP::Message &message, uint64_t del
 }
 
 void AmqpTransportAdapter::handleGetAppInfo(const AMQP::Message &message, uint64_t deliveryTag) {
-  size_t size = 0;
-  m_app->getCapabilitiesJSON(nullptr, size);
-  std::vector<uint8_t> buf(size);
+  std::unique_ptr<TaskParser> taskParser(TaskParserFactory::fromType(TaskParserType::kJson));
 
-  m_app->getCapabilitiesJSON(buf.data(), size);
+  AppInfoTask task = m_app->getAppInfo();
 
-  sendResponse(message, deliveryTag, buf);
+  std::vector<uint8_t> response;
+  if (taskParser == nullptr || taskParser->serialize(response, task) != liret::kOk) {
+    // TODO Implement logging with log levels
+    std::cerr << "[AmqpTransportAdapter] handleGetAppInfo Failed to serialize task! id:" << message.correlationID()
+              << "\n";
+    sendReject(deliveryTag);
+    return;
+  }
+
+  sendResponse(message, deliveryTag, response);
 }
 
 using namespace std::chrono;

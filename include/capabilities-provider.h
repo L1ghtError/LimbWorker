@@ -6,6 +6,8 @@
 #include <string>
 #include <string_view>
 
+#include "app-tasks/task-types.hpp"
+
 #include "utils/status.h"
 
 namespace limb {
@@ -23,16 +25,7 @@ public:
 
   void clear();
 
-  // To prevent json becoming stale between calls
-  // before data modification should ALWAYS lock it
-  void lock();
-  void unlock();
-
-  // there is chache that prevents json recalculation, it can be invalidated
-  void invalidate();
-
-  // return capabilities in json format with two-call pattern
-  liret getCapabilitiesJSON(uint8_t *buf, size_t &size);
+  AppInfoTask getAppInfo();
 
 private:
   class impl;

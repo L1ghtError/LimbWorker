@@ -22,6 +22,8 @@ public:
 
   virtual liret parse(const uint8_t *data, size_t size, PingTask &task) = 0;
   virtual liret serialize(std::vector<uint8_t> &data, PingTask &task) = 0;
+
+  virtual liret serialize(std::vector<uint8_t> &data, AppInfoTask &task) = 0;
 };
 
 class TaskParserFactory {
