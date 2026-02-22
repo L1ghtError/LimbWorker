@@ -20,11 +20,9 @@
 #include "utils/bithacks.h"
 
 int main(int argc, char **argv) {
-  liret err = liret::kOk;
-
   limb::ConfigFactory configF(argc, argv);
   limb::AppConfig config;
-  err = configF.getConfig(config);
+  liret err = configF.getConfig(config);
   if (err != liret::kOk) {
     printf("failed to initialize config %s", listat::getErrorMessage(err));
     return EXIT_FAILURE;

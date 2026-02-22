@@ -13,7 +13,7 @@
 #define DEFAULT_HEARTBEAT 10      // 10 seconds
 class Buffer {
 public:
-  Buffer(size_t size) : m_data(size, 0), m_use(0) {}
+  explicit Buffer(size_t size) : m_data(size, 0), m_use(0) {}
 
   size_t write(const char *data, size_t size) {
     if (m_use == m_data.size()) {
@@ -47,9 +47,8 @@ private:
 
 struct AmqpHandlerImpl {
   AmqpHandlerImpl(const limb::AmqpConfig *_conf = nullptr)
-      : connected(false), connection(nullptr), quit(false), keepAlive(true), inputBuffer(AmqpHandler::BUFFER_SIZE),
-        outBuffer(AmqpHandler::BUFFER_SIZE), tmpBuff(AmqpHandler::TEMP_BUFFER_SIZE), sock(abnet::invalid_socket),
-        conf(_conf) {
+      : inputBuffer(AmqpHandler::BUFFER_SIZE), outBuffer(AmqpHandler::BUFFER_SIZE), sock(abnet::invalid_socket),
+        connection(nullptr), tmpBuff(AmqpHandler::TEMP_BUFFER_SIZE), conf(_conf), quit(false), keepAlive(true) {
 
     if (conf == nullptr) {
       static const limb::AmqpConfig defaultConf{.heartbeat = 60};
@@ -76,12 +75,11 @@ struct AmqpHandlerImpl {
 
   int keepAlive = true;
   int reuseAddr = true;
-  bool connected;
+  bool connected = false;
 };
 
 AmqpHandler::AmqpHandler(const char *host, uint16_t port, const limb::AmqpConfig *conf)
     : m_impl(new AmqpHandlerImpl(conf)) {
-  int err = 0;
   abnet::error_code ec;
   do {
     abnet::sockaddr_in4_type service;
@@ -125,11 +123,10 @@ AmqpHandler::AmqpHandler(const char *host, uint16_t port, const limb::AmqpConfig
 }
 
 void AmqpHandler::loop() {
-  int poll_res = 0;
   abnet::error_code ec;
 
   while (!m_impl->quit) {
-    poll_res = abnet::socket_ops::poll_read(m_impl->sock, 0, 10000, ec);
+    int poll_res = abnet::socket_ops::poll_read(m_impl->sock, 0, 10000, ec);
     if (poll_res == abnet::socket_error_retval) {
       abnet::socket_ops::get_last_error(ec, 0);
       printf("Select error: %s\n", ec.message().c_str());

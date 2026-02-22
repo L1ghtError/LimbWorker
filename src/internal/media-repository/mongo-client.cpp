@@ -149,11 +149,22 @@ liret MongoClient::getImageById(const char *id, size_t size, unsigned char **fil
       if (r == 0) {
         break;
       }
+      unsigned char *tmp;
       if (outBuf == nullptr) {
-        outBuf = (unsigned char *)malloc(r);
+        tmp = (unsigned char *)malloc(r);
       } else {
-        outBuf = (unsigned char *)realloc(outBuf, bufSize + r);
+        tmp = (unsigned char *)realloc(outBuf, bufSize + r);
       }
+
+      if (tmp == nullptr) {
+        ret = liret::kOutOfMemory;
+        if (outBuf != nullptr) {
+          free(outBuf);
+        }
+        break;
+      }
+      outBuf = tmp;
+
       memcpy(outBuf + bufSize, iov.iov_base, r);
       bufSize += r;
     }
@@ -298,7 +309,6 @@ int MongoClient::mongoTest() {
   const bson_t *doc;
   const char *collection_name = "userBase";
   bson_t query;
-  char *str;
   const char *uri_string = "mongodb://192.168.1.101:8005/?appname=client-example";
   mongoc_uri_t *uri;
 
@@ -324,7 +334,7 @@ int MongoClient::mongoTest() {
                                             NULL);                    /* read prefs, NULL for default */
 
   while (mongoc_cursor_next(cursor, &doc)) {
-    str = bson_as_canonical_extended_json(doc, NULL);
+    char *str = bson_as_canonical_extended_json(doc, NULL);
     fprintf(stdout, "%s\n---\n", str);
     bson_free(str);
   }

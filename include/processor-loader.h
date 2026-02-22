@@ -17,7 +17,7 @@ public:
   ProcessorLoader(ProcessorLoader &&pl);
   ~ProcessorLoader();
 
-  liret status();
+  liret status() const;
 
   liret reload();
   liret addLoadDir(const std::string &dirPath);

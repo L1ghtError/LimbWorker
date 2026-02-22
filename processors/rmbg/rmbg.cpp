@@ -3,6 +3,7 @@
 #include "cpu.h"
 #include <gpu.h>
 
+#include <algorithm>
 #include <fstream>
 #include <mutex>
 
@@ -24,11 +25,18 @@ inline liret loadFile(const char *path, std::vector<uint8_t> &buffer) {
   if (!file)
     return liret::kNotFound;
 
-  std::size_t size = file.tellg();
-  if (size < 0)
+  std::streampos pos = file.tellg();
+  if (pos == std::streampos(-1))
     return liret::kAborted;
 
-  file.seekg(0);
+  std::size_t size = static_cast<std::size_t>(pos);
+
+  if (size == 0) {
+    buffer.clear();
+    return liret::kOk;
+  }
+
+  file.seekg(0, std::ios::beg);
 
   buffer.resize(size);
   file.read((char *)buffer.data(), size);
@@ -48,12 +56,7 @@ inline void preprocessImage(const unsigned char *pixels, int type, int w, int h,
 bool cudaSuppored() {
   auto providers = Ort::GetAvailableProviders();
 
-  for (const auto &p : providers) {
-    if (p == cudaEPName) {
-      return true;
-    }
-  }
-  return false;
+  return std::any_of(providers.begin(), providers.end(), [](const std::string &p) { return p == cudaEPName; });
 }
 
 } // namespace

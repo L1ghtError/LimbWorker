@@ -72,14 +72,13 @@ liret tryFillAmqpTransport(const simdjson::dom::element &transport, limb::AmqpCo
 }
 
 liret parseDocument(const simdjson::dom::element &doc, limb::AppConfig &conf) {
-  liret ret = liret::kOk;
-
   if (doc["application"].error()) {
     return liret::kIncomplete;
   }
 
   simdjson::dom::element app = doc["application"];
 
+  liret ret;
   if (app["database"].error() == simdjson::SUCCESS) {
     ret = tryFillMongoConfig(app["database"], conf.dbConfig);
   } else {

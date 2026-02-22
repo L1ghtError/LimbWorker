@@ -15,6 +15,8 @@ typedef void *LibHandle;
 
 namespace {
 
+typedef limb::ProcessorModule *(*getModule_fn_t)();
+
 constexpr char defaultLoadDir[] = "processors";
 
 LibHandle loadLibrary(const char *path) {
@@ -87,19 +89,33 @@ void *getFunction(LibHandle handle, const char *name) {
   return dlsym(handle, name);
 #endif
 }
+
+bool verifyModules(const char *path) {
+  LibHandle handle = loadLibraryUnresolved(path);
+  if (!handle) {
+    return false;
+  }
+
+  getModule_fn_t getModule_fn = reinterpret_cast<getModule_fn_t>(getFunction(handle, "GetProcessorModule"));
+
+  bool success = true;
+  if (!getModule_fn) {
+    success = false;
+  }
+
+  unloadLibrary(handle);
+  return success;
+}
+
 } // namespace
 
 namespace limb {
 
 namespace fs = std::filesystem;
 
-typedef limb::ProcessorModule *(*getModule_fn_t)();
-
 struct LoadedModule {
   LibHandle m_handle;
   limb::ProcessorModule *procModule;
-
-  getModule_fn_t getModule_fn;
 };
 
 class ProcessorLoader::impl {
@@ -110,7 +126,7 @@ public:
     loadDirectories();
   }
 
-  impl(const std::vector<std::string> &additionalDirectories) {
+  explicit impl(const std::vector<std::string> &additionalDirectories) {
     m_loadDirectories.push_back(defaultLoadDir);
 
     for (const auto &newDir : additionalDirectories) {
@@ -131,7 +147,7 @@ public:
 
   ~impl() { unload(); }
 
-  liret status() { return processorCount() > 0 ? liret::kOk : liret::kAborted; }
+  liret status() const { return processorCount() > 0 ? liret::kOk : liret::kAborted; }
 
   liret addLoadDir(const std::string &dirPath) {
     if (!fs::exists(dirPath) || !fs::is_directory(dirPath)) {
@@ -197,23 +213,6 @@ public:
   size_t processorCount() const { return m_modules.size(); }
   size_t dirCount() const { return m_loadDirectories.size() + 1; }
 
-  bool verifyModules(const char *path) {
-    LibHandle handle = loadLibraryUnresolved(path);
-    if (!handle) {
-      return false;
-    }
-
-    getModule_fn_t getModule_fn = reinterpret_cast<getModule_fn_t>(getFunction(handle, "GetProcessorModule"));
-
-    bool success = true;
-    if (!getModule_fn) {
-      success = false;
-    }
-
-    unloadLibrary(handle);
-    return success;
-  }
-
   void loadModules(const fs::path &directory) {
     if (!fs::is_directory(directory)) {
       return;
@@ -233,10 +232,8 @@ public:
 
       // TODO: consider display a warning
       if (!handle) {
-        std::string dlerr = getLastDLError();
         // Try loading and resolving systemwide
         handle = loadLibrary((fullPath).c_str());
-        dlerr = getLastDLError();
         if (!handle) {
           continue;
         }
@@ -251,7 +248,7 @@ public:
       }
 
       std::lock_guard<std::mutex> lock(m_mutex);
-      m_modules.emplace_back(handle, getModule_fn(), getModule_fn);
+      m_modules.emplace_back(handle, getModule_fn());
     }
   }
 
@@ -288,7 +285,7 @@ private:
   std::mutex m_mutex;
 };
 
-liret ProcessorLoader::status() { return pImpl->status(); }
+liret ProcessorLoader::status() const { return pImpl->status(); }
 
 liret ProcessorLoader::reload() {
   pImpl->unload();

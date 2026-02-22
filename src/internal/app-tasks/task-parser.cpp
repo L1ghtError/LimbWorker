@@ -8,7 +8,6 @@ TaskParser *TaskParserFactory::fromType(TaskParserType type) {
   switch (type) {
   case TaskParserType::kJson:
     return new (std::nothrow) JsonTaskParser();
-    return nullptr;
   case TaskParserType::kProtobuf:
     // return new (std::nothrow) ProtobufTaskParser();
     return nullptr;

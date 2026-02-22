@@ -1,5 +1,6 @@
 #include "capabilities-provider.h"
 
+#include <algorithm>
 #include <mutex>
 #include <thread>
 
@@ -11,10 +12,10 @@ public:
 
   liret addAvailableProcessor(std::string_view name, uint32_t index) {
     std::lock_guard<std::mutex> lock(m_mutex);
-    for (const auto &proc : m_appInfo.availableProcessors) {
-      if (proc.index == index) {
-        return liret::kAlreadyExists;
-      }
+
+    if (std::any_of(m_appInfo.availableProcessors.begin(), m_appInfo.availableProcessors.end(),
+                    [index](const AppInfoTask::AvailableProcessor &proc) { return proc.index == index; })) {
+      return liret::kAlreadyExists;
     }
 
     m_appInfo.availableProcessors.push_back(AppInfoTask::AvailableProcessor{std::string(name), index});
