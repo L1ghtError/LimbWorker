@@ -8,14 +8,14 @@
 - [x] Implement dynamic image processor loading
 - [x] Implemnet Repository instead of explicit usage of mongodb
 - [x] Fix mongo-c build on Windows
-- [ ] Implement service that provides unified acess to processors
-- [ ] Increase test coverage
-- [ ] Change Rabbitmq payload type from raw binary to Protobuffs
+- [x] Implement service that provides unified acess to processors
+- [x] Increase test coverage
+- [ ] Add Protobuffs payload type for Rabbitmq
 - [ ] Fix CRUSH when usesr pass image with wrong format
 
 ## 🔴 Implementation Tasks (1.5) 
-- [ ] Implement app configuration file
-- [ ] Remove config usage from all modules and move it to the `main`
+- [x] Implement app configuration file
+- [x] Remove config usage from all modules and move it to the `main`
 - [ ] Optimize image transcoding with `libturbojpeg`
 - [ ] Add pre-commit hooks
 

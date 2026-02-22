@@ -2,7 +2,7 @@
 
 #include <fstream>
 namespace limb {
- liret loadFileContent(const char *path, std::vector<uint8_t> &buffer) {
+liret loadFileContent(const char *path, std::vector<uint8_t> &buffer) {
   std::ifstream file(path, std::ios::binary | std::ios::ate);
   if (!file)
     return liret::kNotFound;

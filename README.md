@@ -10,10 +10,7 @@ Works with [Backend](https://github.com/L1ghtError/LimbService).
 ---
 
 > **WARNING:**  
-> - Application is **NOT** even Alpha.  
-> - It can **CRASH** if the user passes an image with the wrong format.  
-> - All server configuration is **Hardcoded**.  
-> - Only the **precompiled** version of `mongo-c-driver` is suitable.
+> - Application is **NOT** even Alpha, it lacks robustness.
 
 ---
 
@@ -33,10 +30,6 @@ $ cmake --build .
 $ .\limb_app
 ```
 
-Windows:
-> **NOTE (Windows):**
-> For successful Windows builds, ensure that `ncnn`, `mongo-c-driver`, and `amqpcpp` are installed under **C:\Program Files**.
-> CMake presets expect them to be discoverable there.
 ```bash
 $ cmake --preset win-x64-debug
 $ cd build/win-x64-debug
@@ -56,8 +49,9 @@ Docker-compose:
 ** in future updates**
 ```
 
-> **Tech stack:**
+> **Dependencies:**
 >
 > - [ncnn](https://github.com/Tencent/ncnn) as preferred inference runtime
 > - [mongo-c-driver](https://github.com/mongodb/mongo-c-driver) for communication with MongoDb
 > - [AMQP-CPP](https://github.com/CopernicaMarketingSoftware/AMQP-CPP) for communication with workers
+> - [simdjson](https://github.com/simdjson/simdjson) for communication with workers
