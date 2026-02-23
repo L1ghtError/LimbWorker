@@ -16,8 +16,10 @@
 ## 🔴 Implementation Tasks (1.5) 
 - [x] Implement app configuration file
 - [x] Remove config usage from all modules and move it to the `main`
+- [x] Add pre-commit hooks
+- [ ] Implementa abstraction for image format decoding/encoding
+- [ ] Add processor unloading machanism
 - [ ] Optimize image transcoding with `libturbojpeg`
-- [ ] Add pre-commit hooks
 
 📘 Dictionary
 Processor — A module responsible for enhancing or processing provided content, such as images, audio, or other media types. Processors handle specific transformation or optimization tasks, often dynamically loaded depending on the content type.

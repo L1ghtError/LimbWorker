@@ -11,6 +11,7 @@ def run_cppcheck():
         "./include",
         "./src",
         "./processors",
+        "./tests"
     ]
 
     print("Running:", " ".join(cmd))

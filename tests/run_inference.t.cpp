@@ -28,7 +28,7 @@ size_t findProcessorByName(limb::AppBase *application, std::string_view name) {
 
 class MockRepository : public limb::MediaRepository {
 public:
-  MockRepository(std::string path) {
+  explicit MockRepository(std::string path) {
     std::ifstream file(path, std::ios::binary | std::ios::ate);
     if (!file)
       return;
@@ -43,7 +43,7 @@ public:
 
   liret getImageById(const char *id, size_t size, unsigned char **filedata, size_t *filesize) const override {
     *filesize = pixels.size();
-    if (pixels.size() <= 0) {
+    if (pixels.empty()) {
       return liret::kAborted;
     }
 
