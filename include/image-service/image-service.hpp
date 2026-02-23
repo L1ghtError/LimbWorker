@@ -50,6 +50,10 @@ public:
     if (ret != liret::kOk) {
       return ret;
     }
+    if (!m_initializedMap[input.modelId]) {
+      container->init();
+      m_initializedMap[input.modelId] = true;
+    }
 
     auto procDeleter = [container](ImageProcessor *ptr) { container->reclaimProcessor(ptr); };
     std::unique_ptr<ImageProcessor, decltype(procDeleter)> processor(container->tryAcquireProcessor(), procDeleter);
@@ -90,8 +94,10 @@ public:
     }
     if (m_containers.size() < index + 1) {
       m_containers.resize(index + 1);
+      m_initializedMap.resize(m_containers.size(), false);
     }
     m_containers[index] = container;
+    m_initializedMap[index] = false;
 
     return liret::kOk;
   }
@@ -101,13 +107,18 @@ public:
       return false;
     }
     m_containers[index] = nullptr;
+    m_initializedMap[index] = false;
     return true;
   }
 
-  virtual void clear() { m_containers.clear(); }
+  virtual void clear() {
+    m_containers.clear();
+    m_initializedMap.clear();
+  }
 
 private:
   std::vector<ProcessorContainer *> m_containers;
+  std::vector<bool> m_initializedMap;
   Repo m_mediaRepo;
 };
 } // namespace limb

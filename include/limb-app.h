@@ -51,12 +51,6 @@ public:
         return liret::kInvalidInput;
       }
 
-      // TODO: add lazy load, and add unload on idle
-      err = container->init();
-      if (err != liret::kOk) {
-        return err;
-      }
-
       err = m_mediaService.addContainer(i, container.get());
       if (err != liret::kOk) {
         return err;
