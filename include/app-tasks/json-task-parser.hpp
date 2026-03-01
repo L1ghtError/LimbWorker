@@ -12,11 +12,12 @@ namespace limb {
 class JsonTaskParser : public TaskParser {
 public:
   liret parse(const uint8_t *data, size_t size, ImageTask &task) override;
+  liret serialize(std::vector<uint8_t> &data, const ImageTaskResult &task) override;
 
   liret parse(const uint8_t *data, size_t size, PingTask &task) override;
-  liret serialize(std::vector<uint8_t> &data, PingTask &task) override;
+  liret serialize(std::vector<uint8_t> &data, const PingTask &task) override;
 
-  liret serialize(std::vector<uint8_t> &data, AppInfoTask &task) override;
+  liret serialize(std::vector<uint8_t> &data, const AppInfoTask &task) override;
 
 private:
   simdjson::dom::parser m_parser;

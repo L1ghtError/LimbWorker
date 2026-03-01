@@ -2,7 +2,7 @@
 
 #include <cstring>
 
-extern "C" LIMB_API limb::LoopbackModule *createProcessor() { return new limb::LoopbackModule; }
+extern "C" LIMB_API limb::LoopbackModule *GetProcessorModule() { return new limb::LoopbackModule; }
 
 namespace limb {
 LoopbackContainer::LoopbackContainer() {};
@@ -19,6 +19,7 @@ LoopbackProcessor::~LoopbackProcessor() {};
 
 liret LoopbackProcessor::process_image(const ImageInfo &inimage, ImageInfo &outimage,
                                        const ProgressCallback &procb) const {
+  procb(0.0f); // report processing is started
   // Simple copy from input to output
   outimage.w = inimage.w;
   outimage.h = inimage.h;
@@ -26,7 +27,9 @@ liret LoopbackProcessor::process_image(const ImageInfo &inimage, ImageInfo &outi
   size_t datasize = inimage.w * inimage.h * inimage.c;
   outimage.data = new unsigned char[datasize];
   std::memcpy(outimage.data, inimage.data, datasize);
+
   procb(1.0f); // report progress as done
+
   return liret::kOk;
 }
 } // namespace limb

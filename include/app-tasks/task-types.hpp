@@ -14,6 +14,17 @@ struct ImageTask {
   std::string imageId;
 };
 
+struct ImageTaskResult {
+  enum class Status : int32_t {
+    Done = 0,
+    Fail = 1,
+    Progress = 2,
+  };
+
+  std::string message;
+  Status status;
+};
+
 struct PingTask {
   std::string message;
 };

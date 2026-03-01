@@ -16,15 +16,15 @@ constexpr bool g_consumePing = true;
 constexpr auto g_pingResponse = "Pong";
 constexpr auto g_pingRequestPayload = g_pingQueue;
 
-constexpr auto g_processImageCloseMessage = "End";
+constexpr auto g_processImageDoneMessage = "Done";
 constexpr auto g_processImageFailMessage = "Fail";
 
 } // namespace
 
 namespace limb {
-AmqpTransport::AmqpTransport(const AmqpConfig &conf)
+AmqpTransport::AmqpTransport(const AmqpConfig &conf, const tp::ThreadPoolOptions &options)
     : m_handler(conf.host.c_str(), conf.port), m_connection(&m_handler, AMQP::Login(conf.user, conf.passwd), "/"),
-      m_ch(&m_connection), m_conf(conf) {}
+      m_ch(&m_connection), m_conf(conf), m_pool(options) {}
 
 AmqpTransport::~AmqpTransport() { m_handler.quit(); }
 
@@ -65,17 +65,40 @@ liret AmqpTransport::init() {
         // TODO Implement logging with log levels
         std::cout << "[AmqpTransport] ProcessImage id:" << message.correlationID() << "\n";
 
-        handleProcessImage(message, deliveryTag);
+        const auto first = reinterpret_cast<const uint8_t *>(message.body());
+        const auto last = reinterpret_cast<const uint8_t *>(message.body()) + message.bodySize();
+
+        AmqpTask task{.correlationID = message.correlationID(),
+                      .replyTo = message.replyTo(),
+                      .deliveryTag = deliveryTag,
+                      .body{first, last}};
+
+        std::packaged_task<void()> packaged([this, t = std::move(task)]() mutable { handleProcessImage(t); });
+        if (m_pool.tryPost(packaged) == false) {
+          sendReject(deliveryTag);
+        }
       });
 
   return liret::kOk;
+}
+
+void AmqpTransport::sendResponse(AmqpTask &task, const std::vector<uint8_t> &resp) {
+  AMQP::Envelope env((const char *)resp.data(), resp.size());
+  env.setCorrelationID(task.correlationID);
+
+  const auto &repl = task.replyTo;
+
+  std::lock_guard lock(m_chMutex);
+  if (!m_ch.publish("", repl, env)) {
+    std::cerr << "[AmqpTransport] sendResponse (AmqpTask) Failed to send task! id:" << task.correlationID << "\n";
+  }
 }
 
 void AmqpTransport::sendResponse(const AMQP::Message &message, uint64_t deliveryTag, const std::vector<uint8_t> &resp) {
   AMQP::Envelope env((const char *)resp.data(), resp.size());
   env.setCorrelationID(message.correlationID());
 
-  const auto repl = message.replyTo();
+  const auto &repl = message.replyTo();
 
   std::lock_guard lock(m_chMutex);
   m_ch.publish("", repl, env);
@@ -86,7 +109,7 @@ void AmqpTransport::sendResponse(const AMQP::Message &message, uint64_t delivery
   AMQP::Envelope env(resp);
   env.setCorrelationID(message.correlationID());
 
-  const auto repl = message.replyTo();
+  const auto &repl = message.replyTo();
 
   std::lock_guard lock(m_chMutex);
   m_ch.publish("", repl, env);
@@ -95,8 +118,15 @@ void AmqpTransport::sendResponse(const AMQP::Message &message, uint64_t delivery
 
 void AmqpTransport::sendReject(uint64_t deliveryTag) { m_ch.reject(deliveryTag); }
 
+void AmqpTransport::sendAck(uint64_t deliveryTag) {
+  if (!m_ch.ack(deliveryTag)) {
+    // TODO Implement logging with log levels
+    std::cerr << "[AmqpTransport] sendResponse (AmqpTask) Failed to send ack! tag:" << deliveryTag << "\n";
+  }
+}
+
 AmqpTransportAdapter::AmqpTransportAdapter(const AmqpConfig &conf, const tp::ThreadPoolOptions &options)
-    : AmqpTransport(conf), m_app(nullptr), m_pool(options) {}
+    : AmqpTransport(conf, options), m_app(nullptr) {}
 
 AmqpTransportAdapter::~AmqpTransportAdapter() = default;
 
@@ -122,6 +152,7 @@ void AmqpTransportAdapter::handlePing(const AMQP::Message &message, uint64_t del
   }
 
   if (task.message != g_pingRequestPayload) {
+    // TODO Implement logging with log levels
     std::cerr << "[AmqpTransportAdapter] handlePing Failed to parse task! id:" << message.correlationID() << "\n";
     sendReject(deliveryTag);
     return;
@@ -161,52 +192,64 @@ void AmqpTransportAdapter::handleGetAppInfo(const AMQP::Message &message, uint64
 
 using namespace std::chrono;
 
-void AmqpTransportAdapter::handleProcessImage(const AMQP::Message &message, uint64_t deliveryTag) {
-
+void AmqpTransportAdapter::handleProcessImage(AmqpTask &message) {
   std::unique_ptr<TaskParser> taskParser(TaskParserFactory::fromType(TaskParserType::kJson));
 
   limb::ImageTask task;
   if (taskParser == nullptr ||
-      taskParser->parse((const uint8_t *)message.body(), message.bodySize(), task) != liret::kOk) {
+      taskParser->parse((const uint8_t *)message.body.data(), message.body.size(), task) != liret::kOk) {
     // TODO Implement logging with log levels
-    std::cerr << "[AmqpTransportAdapter] handleProcessImage Failed to parse task! id:" << message.correlationID()
-              << "\n";
-    sendReject(deliveryTag);
+    std::cerr << "[AmqpTransportAdapter] handleProcessImage Failed to parse task! id:" << message.correlationID << "\n";
+    sendReject(message.deliveryTag);
     return;
   }
 
-  auto sendResp = [this, &message, &deliveryTag](const std::string &resp) {
-    AmqpTransport::sendResponse(message, deliveryTag, resp);
-  };
+  auto sendRespVec = [this, &message](const std::vector<uint8_t> &resp) { AmqpTransport::sendResponse(message, resp); };
 
-  auto progressCb = [this, &sendResp](float value) {
+  auto progressCb = [this, &taskParser, &message, &sendRespVec](float value) {
     // TODO use dedicated class to provide response in any format
-    const std::string progress = std::format("{{\"progress\":{:.2f}}}", value);
+    const std::string progress = std::format("{:.2f}", value);
     ;
     // TODO Implement logging with log levels
     std::cout << "[AmqpTransportAdapter] handleProcessImage progress:" << progress << "\n";
 
-    sendResp(progress);
-  };
-
-  const auto handler = [this, &task, &progressCb, &sendResp]() {
-    liret ret = m_app->processImage(task, progressCb);
-    if (ret != liret::kOk) {
-      // TODO Implement logging with log levels
-      std::cerr << "[AmqpTransportAdapter] handleProcessImage Error:" << listat::getErrorMessage(ret) << "\n";
-      sendResp(g_processImageFailMessage);
+    std::vector<uint8_t> response;
+    if (taskParser->serialize(response, ImageTaskResult{.message = progress,
+                                                        .status = ImageTaskResult::Status::Progress}) != liret::kOk) {
+      sendReject(message.deliveryTag);
       return;
     }
 
-    std::cout << "[AmqpTransportAdapter] handleProcessImage Done!\n";
-
-    sendResp(g_processImageCloseMessage);
+    sendRespVec(response);
   };
 
-  std::packaged_task<void()> packaged(handler);
-  if (m_pool.tryPost(packaged) == false) {
-    sendReject(deliveryTag);
+  liret ret = m_app->processImage(task, progressCb);
+  if (ret != liret::kOk) {
+    // TODO Implement logging with log levels
+    std::cerr << "[AmqpTransportAdapter] handleProcessImage Error:" << listat::getErrorMessage(ret) << "\n";
+
+    std::vector<uint8_t> response;
+    if (taskParser->serialize(response, ImageTaskResult{.message = g_processImageFailMessage,
+                                                        .status = ImageTaskResult::Status::Fail}) != liret::kOk) {
+      sendReject(message.deliveryTag);
+      return;
+    }
+
+    sendRespVec(response);
+    return;
   }
+
+  std::cout << "[AmqpTransportAdapter] handleProcessImage Done!\n";
+
+  std::vector<uint8_t> response;
+  if (taskParser->serialize(response, ImageTaskResult{.message = g_processImageDoneMessage,
+                                                      .status = ImageTaskResult::Status::Done}) != liret::kOk) {
+    sendReject(message.deliveryTag);
+    return;
+  }
+
+  sendRespVec(response);
+  sendAck(message.deliveryTag);
 }
 
 } // namespace limb

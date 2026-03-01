@@ -17,9 +17,18 @@
 
 namespace limb {
 
+struct AmqpTask {
+  const std::string correlationID;
+  const std::string replyTo;
+
+  uint64_t deliveryTag;
+
+  std::vector<uint8_t> body;
+};
+
 class AmqpTransport {
 public:
-  AmqpTransport(const AmqpConfig &conf);
+  AmqpTransport(const AmqpConfig &conf, const tp::ThreadPoolOptions &options);
   virtual ~AmqpTransport();
 
   liret loop();
@@ -27,14 +36,22 @@ public:
 
   virtual void handlePing(const AMQP::Message &message, uint64_t deliveryTag) = 0;
   virtual void handleGetAppInfo(const AMQP::Message &message, uint64_t deliveryTag) = 0;
-  virtual void handleProcessImage(const AMQP::Message &message, uint64_t deliveryTag) = 0;
+  virtual void handleProcessImage(AmqpTask &message) = 0;
 
 protected:
   liret init();
 
+  // Sends a response using a task state object.
+  // This version is intended for scenarios where multiple messages may be sent using the same task.
+  // Note: The caller is responsible for manually acknowledging the task after sending.
+  void sendResponse(AmqpTask &task, const std::vector<uint8_t> &resp);
+
+  // Sends a response to a specific AMQP message and automatically acknowledges it.
   void sendResponse(const AMQP::Message &message, uint64_t deliveryTag, const std::vector<uint8_t> &resp);
   void sendResponse(const AMQP::Message &message, uint64_t deliveryTag, const std::string &resp);
+
   void sendReject(uint64_t deliveryTag);
+  void sendAck(uint64_t deliveryTag);
 
 private:
   AmqpHandler m_handler;
@@ -43,6 +60,8 @@ private:
 
   std::mutex m_chMutex;
   const AmqpConfig &m_conf;
+
+  tp::ThreadPool m_pool;
 };
 
 class AmqpTransportAdapter : public AmqpTransport {
@@ -54,11 +73,10 @@ public:
 
   void handlePing(const AMQP::Message &message, uint64_t deliveryTag) override;
   void handleGetAppInfo(const AMQP::Message &message, uint64_t deliveryTag) override;
-  void handleProcessImage(const AMQP::Message &message, uint64_t deliveryTag) override;
+  void handleProcessImage(AmqpTask &message) override;
 
 private:
   AppBase *m_app;
-  tp::ThreadPool m_pool;
 };
 
 } // namespace limb

@@ -27,6 +27,23 @@ liret JsonTaskParser::parse(const uint8_t *data, size_t size, ImageTask &task) {
   return liret::kOk;
 }
 
+liret JsonTaskParser::serialize(std::vector<uint8_t> &data, const ImageTaskResult &task) {
+  std::lock_guard<std::mutex> lock(m_builderMutex);
+
+  m_builder.clear();
+  m_builder.start_object();
+  m_builder.append_key_value("message", task.message);
+  m_builder.append_comma();
+  m_builder.append_key_value("status", int32_t(task.status));
+  m_builder.end_object();
+
+  data.resize(m_builder.size());
+
+  std::memcpy(reinterpret_cast<void *>(data.data()), m_builder.c_str().value(), m_builder.size());
+
+  return liret::kOk;
+}
+
 liret JsonTaskParser::parse(const uint8_t *data, size_t size, PingTask &task) {
   if (data == nullptr || size == 0) {
     return liret::kInvalidInput;
@@ -46,7 +63,7 @@ liret JsonTaskParser::parse(const uint8_t *data, size_t size, PingTask &task) {
   return liret::kOk;
 }
 
-liret JsonTaskParser::serialize(std::vector<uint8_t> &data, PingTask &task) {
+liret JsonTaskParser::serialize(std::vector<uint8_t> &data, const PingTask &task) {
   std::lock_guard<std::mutex> lock(m_builderMutex);
 
   m_builder.clear();
@@ -60,7 +77,7 @@ liret JsonTaskParser::serialize(std::vector<uint8_t> &data, PingTask &task) {
   return liret::kOk;
 }
 
-liret JsonTaskParser::serialize(std::vector<uint8_t> &data, AppInfoTask &task) {
+liret JsonTaskParser::serialize(std::vector<uint8_t> &data, const AppInfoTask &task) {
   std::lock_guard<std::mutex> lock(m_builderMutex);
 
   m_builder.clear();
@@ -76,7 +93,6 @@ liret JsonTaskParser::serialize(std::vector<uint8_t> &data, AppInfoTask &task) {
     m_builder.append_key_value("index", task.availableProcessors[i].index);
     m_builder.append_comma();
     m_builder.append_key_value("name", task.availableProcessors[i].name);
-    m_builder.append_comma();
     m_builder.end_object();
 
     if (i < task.availableProcessors.size() - 1) {
