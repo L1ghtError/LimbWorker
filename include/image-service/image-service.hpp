@@ -8,10 +8,12 @@
 #include <vector>
 
 #include "app-tasks/task-types.hpp"
+
 #include "media-repository/media-repository.hpp"
 
+#include "image/png-codec.hpp"
+
 #include "utils/status.h"
-#include "utils/stb-wrap.h"
 
 namespace limb {
 
@@ -39,11 +41,12 @@ public:
       return ret;
     }
 
-    auto stbiDeleter = [](uint8_t *ptr) { stbi_image_free(ptr); };
-
-    int w, h, c;
-    std::unique_ptr<uint8_t[], decltype(stbiDeleter)> inPixel(
-        stbi_load_from_memory(inImageData.get(), size, &w, &h, &c, 0), stbiDeleter);
+    image::Container inPixel;
+    auto codec = image::CodecFactory::fromType(image::CodecType::kPng);
+    ret = codec->decode(std::span<image::EncodedDataType>(inImage, size), inPixel);
+    if (ret != liret::kOk) {
+      return ret;
+    }
 
     ProcessorContainer *container;
     ret = getContainer(input.modelId, &container);
@@ -61,20 +64,23 @@ public:
       return liret::kAborted;
     }
 
-    ImageInfo inImageInfo{.data = inPixel.get(), .w = w, .h = h, .c = c};
+    ImageInfo inImageInfo{.data = inPixel.data.get(), .w = inPixel.w, .h = inPixel.h, .c = inPixel.c};
     ImageInfo outImageInfo;
     ret = processor->process_image(inImageInfo, outImageInfo, ProgressCallback(procb));
-    std::unique_ptr<uint8_t[]> outPixel(outImageInfo.data);
     if (ret != liret::kOk) {
       return ret;
     }
 
-    int outSize = 0;
-    std::unique_ptr<uint8_t[], decltype(stbiDeleter)> outImage(
-        lib_image_write_png_to_mem(outPixel.get(), 0, outImageInfo.w, outImageInfo.h, outImageInfo.c, &outSize),
-        stbiDeleter);
+    image::Container outPixel{
+        .data = image::ContainerData(outImageInfo.data, [](image::ContainerDataType *ptr) { delete[] ptr; }),
+        .size = outImageInfo.size,
+        .w = outImageInfo.w,
+        .h = outImageInfo.h,
+        .c = outImageInfo.c};
 
-    return m_mediaRepo.updateImageById(input.imageId.c_str(), input.imageId.size(), outImage.get(), outSize);
+    return codec->encode(outPixel, [this, &input](image::EncodeData data, size_t size) {
+      return m_mediaRepo.updateImageById(input.imageId.c_str(), input.imageId.size(), data.get(), size);
+    });
   }
 
   virtual size_t processorCount() { return m_containers.size(); }
