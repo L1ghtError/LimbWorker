@@ -10,6 +10,8 @@ public:
   PngCodec() = default;
   ~PngCodec() override = default;
 
+  static bool canDecode(std::span<const EncodedDataType> encoded);
+
   liret decode(std::span<const EncodedDataType> encoded, Container &container) override;
 
   liret encode(const Container &container, EncodeCb cb) override;

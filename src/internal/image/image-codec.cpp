@@ -1,28 +1,29 @@
 #include "image/image-codec.hpp"
 
+#include "image/jpg-codec.hpp"
 #include "image/png-codec.hpp"
 
-#include "image/image-utils.hpp"
-
 namespace limb::image {
-std::unique_ptr<Codec> CodecFactory::fromType(CodecType type) {
+std::unique_ptr<Codec> CodecFactory::fromType(CodecType type, AllocationType at) {
   switch (type) {
-  case CodecType::kPng: {
-    const auto ptr = new (std::nothrow) PngCodec();
-    return std::unique_ptr<Codec>{ptr};
+  case CodecType::kPng:
+    return std::make_unique<PngCodec>();
+  case CodecType::kJpg: {
+    Codec *codec = new (std::nothrow) JpgCodec;
+    return std::unique_ptr<Codec>{codec};
   }
-  case CodecType::kJpg:
-    return nullptr; // new (std::nothrow) JpgCodec();
   default:
     return nullptr;
   }
 }
 
-std::unique_ptr<Codec> CodecFactory::fromData(std::span<const EncodedDataType> encoded) {
-  if (isPng(encoded)) {
-    const auto ptr = new (std::nothrow) PngCodec();
-    return std::unique_ptr<Codec>{ptr};
+std::unique_ptr<Codec> CodecFactory::fromData(std::span<const EncodedDataType> encoded, AllocationType at) {
+  if (PngCodec::canDecode(encoded)) {
+    return fromType(CodecType::kPng, at);
+  } else if (JpgCodec::canDecode(encoded)) {
+    return fromType(CodecType::kJpg, at);
   }
+
   return nullptr;
 }
 } // namespace limb::image

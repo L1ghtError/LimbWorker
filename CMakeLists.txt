@@ -13,6 +13,9 @@ find_program(GLSLANGVALIDATOR_EXECUTABLE NAMES glslangValidator
     PATHS $ENV{VULKAN_SDK}/bin /usr/bin /usr/local/bin
     NO_CMAKE_FIND_ROOT_PATH)
 
+# Includes
+include(FetchContent)
+
 if(NOT GLSLANGVALIDATOR_EXECUTABLE)
     message(FATAL_ERROR "glslangValidator not found! Please install the Vulkan SDK or glslang-tools.")
 endif()
@@ -111,6 +114,7 @@ option(USE_SYSTEM_NCNN "build with system libncnn" ON)
 option(USE_SYSTEM_AMQP_CPP "build with system AMQP-CPP" ON)
 option(USE_SYSTEM_MONGO_C_DRIVER "build with system mongoc" ON)
 option(USE_SYSTEM_SIMDJSON "build with system simdjson" ON)
+option(USE_SYSTEM_LIBJPEG_TURBO "build with system simdjson" ON)
 
 option(ENABLE_TESTS "build with tests" ON)
 
@@ -119,12 +123,34 @@ set(AMQP_CPP_ROOTDIR "Dependencies/AMQP-CPP")
 set(GTEST_ROOTDIR "Dependencies/googletest")
 set(MONGO_C_DRIVER_ROOTDIR "Dependencies/mongo-c-driver")
 set(SIMDJSON_ROOTDIR "Dependencies/simdjson")
+set(LIBJPEG_TURBO_ROOTDIR "Dependencies/libjpeg-turbo")
 ## Some of commands need absolute path to be executed
 set(ABSOLUTE_NCNN_ROOTDIR "${CMAKE_CURRENT_SOURCE_DIR}/${NCNN_ROOTDIR}")
 set(ABSOLUTE_AMQP_CPP_ROOTDIR "${CMAKE_CURRENT_SOURCE_DIR}/${AMQP_CPP_ROOTDIR}")
 set(ABSOLUTE_GTEST_ROOTDIR "${CMAKE_CURRENT_SOURCE_DIR}/${GTEST_ROOTDIR}")
 set(ABSOLUTE_MONGO_C_DRIVER_ROOTDIR "${CMAKE_CURRENT_SOURCE_DIR}/${MONGO_C_DRIVER_ROOTDIR}")
 set(ABSOLUTE_SIMDJSON_ROOTDIR "${CMAKE_CURRENT_SOURCE_DIR}/${SIMDJSON_ROOTDIR}")
+set(ABSOLUTE_LIBJPEG_TURBO_ROOTDIR "${CMAKE_CURRENT_SOURCE_DIR}/${LIBJPEG_TURBO_ROOTDIR}")
+
+# Lib Dependencies
+add_library(lib_dependencies INTERFACE)
+
+# Link LIBJPEG_TURBO
+if (USE_SYSTEM_LIBJPEG_TURBO)
+    find_package(libjpeg-turbo CONFIG)
+    if (NOT TARGET libjpeg-turbo::jpeg)
+        message(WARNING "libjpeg-turbo target not found! USE_SYSTEM_LIBJPEG_TURBO will be turned off.")
+        set(USE_SYSTEM_LIBJPEG_TURBO OFF)
+    endif()
+endif()
+
+if(NOT USE_SYSTEM_LIBJPEG_TURBO)
+    if(NOT EXISTS "${ABSOLUTE_LIBJPEG_TURBO_ROOTDIR}/CMakeLists.txt")
+        message(FATAL_ERROR "${ABSOLUTE_LIBJPEG_TURBO_ROOTDIR}/CMakeLists.txt The submodules were not downloaded! Please update submodules with \"git submodule update --init --recursive\" and try again.")
+    endif()
+
+    add_subdirectory("${LIBJPEG_TURBO_ROOTDIR}")
+endif()
 
 # Link SIMDJSON
 if (USE_SYSTEM_SIMDJSON)
@@ -136,7 +162,6 @@ if (USE_SYSTEM_SIMDJSON)
 endif()
 
 if(NOT USE_SYSTEM_SIMDJSON)
-    # build ncnn library
     if(NOT EXISTS "${ABSOLUTE_SIMDJSON_ROOTDIR}/CMakeLists.txt")
         message(FATAL_ERROR "${ABSOLUTE_SIMDJSON_ROOTDIR}/CMakeLists.txt The submodules were not downloaded! Please update submodules with \"git submodule update --init --recursive\" and try again.")
     endif()
@@ -153,7 +178,6 @@ if(USE_SYSTEM_MONGO_C_DRIVER)
 endif()
 
 if(NOT USE_SYSTEM_MONGO_C_DRIVER)
-    # build ncnn library
     if(NOT EXISTS "${ABSOLUTE_MONGO_C_DRIVER_ROOTDIR}/CMakeLists.txt")
         message(FATAL_ERROR "${ABSOLUTE_MONGO_C_DRIVER_ROOTDIR}/CMakeLists.txt The submodules were not downloaded! Please update submodules with \"git submodule update --init --recursive\" and try again.")
     endif()
@@ -163,7 +187,6 @@ endif()
 
 # Link AMQP-CPP
 if(USE_SYSTEM_AMQP_CPP)
-    # TODO: test on linux
     find_package(amqpcpp)
     if(NOT TARGET amqpcpp)
         message(WARNING "amqpcpp target not found! USE_SYSTEM_AMQP_CPP will be turned off.")
@@ -172,13 +195,12 @@ if(USE_SYSTEM_AMQP_CPP)
 endif()
 
 if(NOT USE_SYSTEM_AMQP_CPP)
-    # build ncnn library
     if(NOT EXISTS "${ABSOLUTE_AMQP_CPP_ROOTDIR}/CMakeLists.txt")
         message(FATAL_ERROR "${ABSOLUTE_AMQP_CPP_ROOTDIR}/CMakeLists.txt The submodules were not downloaded! Please update submodules with \"git submodule update --init --recursive\" and try again.")
     endif()
 
     option(AMQP-CPP_BUILD_SHARED "" OFF)
-    option(AMQP-CPP_LINUX_TCP "" OFF) # TODO: on linux may need to be true
+    option(AMQP-CPP_LINUX_TCP "" OFF)
     option(AMQP-CPP_BUILD_EXAMPLES "" OFF)
 
     add_subdirectory("${AMQP_CPP_ROOTDIR}")
@@ -294,12 +316,11 @@ if(NOT USE_SYSTEM_NCNN)
     add_subdirectory("${NCNN_ROOTDIR}")
 endif()
 
-add_library(lib_dependencies INTERFACE)
-# Includes
+# Target Includes
 target_include_directories(lib_dependencies INTERFACE "Dependencies/AMQP-CPP/include")
 target_include_directories(lib_dependencies INTERFACE "Dependencies/abnet/include")
 
-target_link_libraries(lib_dependencies INTERFACE ncnn amqpcpp mongoc::static Threads::Threads simdjson::simdjson)
+target_link_libraries(lib_dependencies INTERFACE ncnn amqpcpp mongoc::static Threads::Threads simdjson::simdjson libjpeg-turbo)
 
 # Tests
 if (ENABLE_TESTS)

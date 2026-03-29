@@ -17,12 +17,15 @@ public:
   virtual liret encode(const Container &container, EncodeCb cb) = 0;
 };
 
+enum class AllocationType { Initial = 0, Lazy = 1 };
+
 class CodecFactory {
 public:
   [[nodiscard]]
-  static std::unique_ptr<Codec> fromType(CodecType type);
+  static std::unique_ptr<Codec> fromType(CodecType type, AllocationType at = AllocationType::Lazy);
   [[nodiscard]]
-  static std::unique_ptr<Codec> fromData(std::span<const EncodedDataType> encoded);
+  static std::unique_ptr<Codec> fromData(std::span<const EncodedDataType> encoded,
+                                         AllocationType at = AllocationType::Lazy);
 };
 
 } // namespace limb::image

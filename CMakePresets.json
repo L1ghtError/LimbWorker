@@ -11,7 +11,7 @@
                 "ncnn_DIR": "C:/Program Files/ncnn/lib/cmake/ncnn",
                 "mongoc_DIR": "C:/Program Files/mongo-c-driver/lib/cmake/mongoc-2.1.2",
                 "amqpcpp_DIR": "C:/Program Files/amqpcpp/cmake",
-                "USE_SYSTEM_AMQP_CPP": "ON",
+                "USE_SYSTEM_AMQP_CPP": "OFF",
                 "USE_SYSTEM_MONGO_C_DRIVER": "ON",
                 "USE_SYSTEM_NCNN": "ON"
             },
