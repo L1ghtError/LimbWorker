@@ -1,11 +1,14 @@
 #include "image/png-codec.hpp"
 
-#include "image/image-utils.hpp"
-
 #include "utils/status.h"
 #include "utils/stb-wrap.h"
 
+#include <array>
+
 namespace {
+
+constexpr std::array<unsigned char, 8> pngSignature = {0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
+
 void commonDeleter(void *ptr) {
   if (!ptr) {
     return;
@@ -16,8 +19,20 @@ void commonDeleter(void *ptr) {
 
 namespace limb::image {
 
+bool PngCodec::canDecode(std::span<const EncodedDataType> encoded) {
+  if (encoded.size() < pngSignature.size())
+    return false;
+
+  for (size_t i = 0; i < pngSignature.size(); ++i) {
+    if (encoded[i] != pngSignature[i])
+      return false;
+  }
+
+  return true;
+}
+
 liret PngCodec::decode(std::span<const EncodedDataType> encoded, Container &container) {
-  if (!isPng(encoded)) {
+  if (!canDecode(encoded)) {
     return liret::kInvalidInput;
   }
   int w, h, c;
@@ -45,5 +60,7 @@ liret PngCodec::encode(const Container &container, EncodeCb cb) {
 
   return cb(std::move(data), outSize);
 };
+
+CodecType PngCodec::type() const { return CodecType::kPng; }
 
 } // namespace limb::image

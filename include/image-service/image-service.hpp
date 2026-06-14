@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <utility>
 #include <vector>
 
@@ -11,6 +12,7 @@
 
 #include "media-repository/media-repository.hpp"
 
+#include "image/jpg-codec.hpp"
 #include "image/png-codec.hpp"
 
 #include "utils/status.h"
@@ -42,8 +44,11 @@ public:
     }
 
     image::Container inPixel;
-    auto codec = image::CodecFactory::fromType(image::CodecType::kPng);
-    ret = codec->decode(std::span<image::EncodedDataType>(inImage, size), inPixel);
+    auto codecFactory = image::CodecFactory::getInstance();
+
+    std::span<image::EncodedDataType> imageSpan{inImage, size};
+    auto codec = codecFactory->acquireFromData(imageSpan);
+    ret = codec->decode(imageSpan, inPixel);
     if (ret != liret::kOk) {
       return ret;
     }
@@ -53,6 +58,8 @@ public:
     if (ret != liret::kOk) {
       return ret;
     }
+
+    // Provide guarantee that multiple call of init wont break a system
     if (!m_initializedMap[input.modelId]) {
       container->init();
       m_initializedMap[input.modelId] = true;
@@ -78,9 +85,17 @@ public:
         .h = outImageInfo.h,
         .c = outImageInfo.c};
 
-    return codec->encode(outPixel, [this, &input](image::EncodeData data, size_t size) {
+    const auto encodeCb = [this, &input](image::EncodeData data, size_t size) {
       return m_mediaRepo.updateImageById(input.imageId.c_str(), input.imageId.size(), data.get(), size);
-    });
+    };
+
+    using CodecType = limb::image::CodecType;
+    if (outPixel.c == 4 && codec->type() == CodecType::kJpg) {
+      auto pngCodec = codecFactory->acquireFromType(CodecType::kPng);
+      return pngCodec->encode(outPixel, encodeCb);
+    }
+
+    return codec->encode(outPixel, encodeCb);
   }
 
   virtual size_t processorCount() { return m_containers.size(); }
