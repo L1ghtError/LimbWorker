@@ -16,12 +16,14 @@ public:
 
   liret encode(const Container &container, EncodeCb cb) override;
 
+  CodecType type() const override;
+
 private:
   static void _tjDeleter(void *ptr);
 
 private:
-  std::unique_ptr<void, decltype(_tjDeleter)> m_jpegCompressor;
-  std::unique_ptr<void, decltype(_tjDeleter)> m_jpegDecompressor;
+  std::unique_ptr<void, decltype(&_tjDeleter)> m_jpegCompressor;
+  std::unique_ptr<void, decltype(&_tjDeleter)> m_jpegDecompressor;
 };
 
 } // namespace limb::image

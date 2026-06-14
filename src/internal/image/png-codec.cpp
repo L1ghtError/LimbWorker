@@ -61,4 +61,6 @@ liret PngCodec::encode(const Container &container, EncodeCb cb) {
   return cb(std::move(data), outSize);
 };
 
+CodecType PngCodec::type() const { return CodecType::kPng; }
+
 } // namespace limb::image

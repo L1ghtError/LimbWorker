@@ -3,6 +3,7 @@
 #include <turbojpeg.h>
 
 #include <array>
+#include <vector>
 
 namespace {
 
@@ -55,7 +56,9 @@ liret JpgCodec::decode(std::span<const EncodedDataType> encoded, Container &cont
   }
 
   int jpegSubsamp, w, h, c;
-  if (tjDecompressHeader2(m_jpegDecompressor.get(), encoded.data(), encoded.size(), &w, &h, &jpegSubsamp) != 0) {
+  std::vector<EncodedDataType> encodedCopy(encoded.begin(), encoded.end());
+  if (tjDecompressHeader2(m_jpegDecompressor.get(), encodedCopy.data(), encodedCopy.size(), &w, &h, &jpegSubsamp) !=
+      0) {
     return liret::kInvalidInput;
   }
 
@@ -106,7 +109,7 @@ liret JpgCodec::encode(const Container &container, EncodeCb cb) {
   unsigned long outSize;
   unsigned char *jpegBuf;
   tjCompress2(m_jpegCompressor.get(), container.data.get(), container.w, 0, container.h, format, &jpegBuf, &outSize,
-              TJSAMP_444, kCompressQuality, TJFLAG_FASTDCT);
+              TJSAMP_444, kCompressQuality, TJFLAG_ACCURATEDCT);
   if (!jpegBuf) {
     return liret::kAborted;
   }
@@ -118,5 +121,7 @@ liret JpgCodec::encode(const Container &container, EncodeCb cb) {
 
   return cb(std::move(compressed), outSize);
 };
+
+CodecType JpgCodec::type() const { return CodecType::kJpg; }
 
 } // namespace limb::image

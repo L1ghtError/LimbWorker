@@ -15,6 +15,8 @@ public:
   liret decode(std::span<const EncodedDataType> encoded, Container &container) override;
 
   liret encode(const Container &container, EncodeCb cb) override;
+
+  CodecType type() const override;
 };
 
 } // namespace limb::image

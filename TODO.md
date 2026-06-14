@@ -23,6 +23,8 @@
 - [ ] Separate generation logic in CMake by splitting one file into multiple organized files
 - [ ] make onnxruntime shared lib visible for rmbg processors without manual 
 - [ ] Implement valid program instalation
+- [ ] Fork AMQP cpp and raise cmake minimum version
+- [ ] Update metadata in database if input was jpg and output is png
 
 
 📘 Dictionary

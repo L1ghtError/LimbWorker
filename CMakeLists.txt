@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_PROJECT_TOP_LEVEL_INCLUDES "scripts/conan_provider.cmake")
 project (LimbMediaService VERSION 1.0 LANGUAGES C CXX)
 
 # Threads
@@ -12,9 +13,6 @@ find_package(Vulkan REQUIRED)
 find_program(GLSLANGVALIDATOR_EXECUTABLE NAMES glslangValidator
     PATHS $ENV{VULKAN_SDK}/bin /usr/bin /usr/local/bin
     NO_CMAKE_FIND_ROOT_PATH)
-
-# Includes
-include(FetchContent)
 
 if(NOT GLSLANGVALIDATOR_EXECUTABLE)
     message(FATAL_ERROR "glslangValidator not found! Please install the Vulkan SDK or glslang-tools.")
@@ -114,7 +112,6 @@ option(USE_SYSTEM_NCNN "build with system libncnn" ON)
 option(USE_SYSTEM_AMQP_CPP "build with system AMQP-CPP" ON)
 option(USE_SYSTEM_MONGO_C_DRIVER "build with system mongoc" ON)
 option(USE_SYSTEM_SIMDJSON "build with system simdjson" ON)
-option(USE_SYSTEM_LIBJPEG_TURBO "build with system simdjson" ON)
 
 option(ENABLE_TESTS "build with tests" ON)
 
@@ -134,23 +131,6 @@ set(ABSOLUTE_LIBJPEG_TURBO_ROOTDIR "${CMAKE_CURRENT_SOURCE_DIR}/${LIBJPEG_TURBO_
 
 # Lib Dependencies
 add_library(lib_dependencies INTERFACE)
-
-# Link LIBJPEG_TURBO
-if (USE_SYSTEM_LIBJPEG_TURBO)
-    find_package(libjpeg-turbo CONFIG)
-    if (NOT TARGET libjpeg-turbo::jpeg)
-        message(WARNING "libjpeg-turbo target not found! USE_SYSTEM_LIBJPEG_TURBO will be turned off.")
-        set(USE_SYSTEM_LIBJPEG_TURBO OFF)
-    endif()
-endif()
-
-if(NOT USE_SYSTEM_LIBJPEG_TURBO)
-    if(NOT EXISTS "${ABSOLUTE_LIBJPEG_TURBO_ROOTDIR}/CMakeLists.txt")
-        message(FATAL_ERROR "${ABSOLUTE_LIBJPEG_TURBO_ROOTDIR}/CMakeLists.txt The submodules were not downloaded! Please update submodules with \"git submodule update --init --recursive\" and try again.")
-    endif()
-
-    add_subdirectory("${LIBJPEG_TURBO_ROOTDIR}")
-endif()
 
 # Link SIMDJSON
 if (USE_SYSTEM_SIMDJSON)
@@ -205,6 +185,9 @@ if(NOT USE_SYSTEM_AMQP_CPP)
 
     add_subdirectory("${AMQP_CPP_ROOTDIR}")
 endif()
+
+# Link LIBJPEG_TURBO
+find_package(libjpeg-turbo REQUIRED)
 
 # Link NCNN
 if(USE_SYSTEM_NCNN)
@@ -320,7 +303,7 @@ endif()
 target_include_directories(lib_dependencies INTERFACE "Dependencies/AMQP-CPP/include")
 target_include_directories(lib_dependencies INTERFACE "Dependencies/abnet/include")
 
-target_link_libraries(lib_dependencies INTERFACE ncnn amqpcpp mongoc::static Threads::Threads simdjson::simdjson libjpeg-turbo)
+target_link_libraries(lib_dependencies INTERFACE ncnn amqpcpp mongoc::static Threads::Threads simdjson::simdjson libjpeg-turbo::turbojpeg-static)
 
 # Tests
 if (ENABLE_TESTS)

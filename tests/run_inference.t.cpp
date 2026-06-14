@@ -86,7 +86,7 @@ public:
 
     fs::current_path(cwd.parent_path());
 
-    const char *filepath = "input.png";
+    const char *filepath = "input.jpg";
 
     application = std::make_unique<
         limb::App<limb::ImageService<MockRepository>, limb::ProcessorLoader, limb::CapabilitiesProvider>>(
@@ -123,7 +123,7 @@ TEST_F(InferenceRunner, realEsrgan_verify) {
   size_t pc = findProcessorByName(application.get(), pn);
   ASSERT_NE(pc, -1) << pn << " not found!";
 
-  limb::ImageTask task{.imageId = "./realesrgan_test_output.png"};
+  limb::ImageTask task{.imageId = "./realesrgan_test_output.jpg"};
   task.modelId = pc;
 
   auto log_delta_ms = [](float val) {
