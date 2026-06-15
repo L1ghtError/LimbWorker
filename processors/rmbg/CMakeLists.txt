@@ -76,4 +76,42 @@ add_dependencies(${PLUGIN_NAME} ${PLUGIN_NAME}-generate-spirv)
 
 target_compile_definitions(${PLUGIN_NAME} PRIVATE RMBG_EXPORTS)
 
+# ------------------------------------------------------------
+# Copy ONNX Runtime shared libraries to plugin output dir
+# ------------------------------------------------------------
+
+set(PLUGIN_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}")
+
+add_custom_command(TARGET ${PLUGIN_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${PLUGIN_OUTPUT_DIR}"
+)
+
+# Core ONNX Runtime shared libs
+add_custom_command(TARGET ${PLUGIN_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${ONNXRUNTIME_PATH}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}onnxruntime${CMAKE_SHARED_LIBRARY_SUFFIX}"
+        "${PLUGIN_OUTPUT_DIR}"
+)
+
+add_custom_command(TARGET ${PLUGIN_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${ONNXRUNTIME_PATH}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}onnxruntime_providers_shared${CMAKE_SHARED_LIBRARY_SUFFIX}"
+        "${PLUGIN_OUTPUT_DIR}"
+)
+
+# GPU libs (only if CUDA is present)
+if(CUDAToolkit_FOUND)
+    add_custom_command(TARGET ${PLUGIN_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${ONNXRUNTIME_PATH}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}onnxruntime_providers_cuda${CMAKE_SHARED_LIBRARY_SUFFIX}"
+            "${PLUGIN_OUTPUT_DIR}"
+    )
+
+    add_custom_command(TARGET ${PLUGIN_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${ONNXRUNTIME_PATH}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}onnxruntime_providers_tensorrt${CMAKE_SHARED_LIBRARY_SUFFIX}"
+            "${PLUGIN_OUTPUT_DIR}"
+    )
+endif()
+
 message(STATUS "Built plugin: ${PLUGIN_NAME}")
