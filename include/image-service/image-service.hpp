@@ -38,10 +38,10 @@ public:
     size_t size;
 
     liret ret = m_mediaRepo.getImageById(input.imageId.c_str(), input.imageId.size(), &inImage, &size);
-    std::unique_ptr<uint8_t[]> inImageData(inImage);
     if (ret != liret::kOk) {
       return ret;
     }
+    std::unique_ptr<uint8_t[]> inImageData(inImage);
 
     image::Container inPixel;
     auto codecFactory = image::CodecFactory::getInstance();
