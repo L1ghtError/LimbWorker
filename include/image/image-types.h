@@ -21,11 +21,7 @@ using EncodeData = std::unique_ptr<EncodedDataType, EncodedDataDeleter>;
 
 using EncodeCb = std::function<liret(EncodeData, size_t)>;
 
-enum class CodecType {
-  kPng = 0,
-  kJpg = 1,
-  Count
-};
+enum class CodecType { kPng = 0, kJpg = 1, Count };
 
 struct Container {
   ContainerData data;
