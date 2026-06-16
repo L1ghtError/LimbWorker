@@ -118,7 +118,7 @@ protected:
 };
 
 TEST_F(LoopbackVerify, loopback_verify) {
-  const char pn[] = "Loopback-Processor";
+  const char pn[] = "Loopback";
   size_t pc = findProcessorByName(application.get(), pn);
   ASSERT_NE(pc, -1) << pn << " not found!";
 

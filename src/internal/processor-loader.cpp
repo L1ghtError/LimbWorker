@@ -135,7 +135,7 @@ public:
 
       const auto it = std::find_if(m_loadDirectories.begin(), m_loadDirectories.end(),
                                    [&newDir](const std::string_view additionalDirectory) {
-                                     return fs::equivalent(newDir, additionalDirectory);
+                                     return noexcept(fs::equivalent(newDir, additionalDirectory));
                                    });
 
       if (it == m_loadDirectories.end()) {

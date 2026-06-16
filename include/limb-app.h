@@ -70,10 +70,9 @@ public:
     const size_t pc = m_mediaService.processorCount();
 
     for (int i = 0; i < pc; i++) {
-      ProcessorContainer *container;
-      if (m_mediaService.getContainer(i, &container) == liret::kOk) {
-        container->deinit();
-        m_processorLoader.destroyContainer(container);
+      auto container = m_mediaService.getContainer(i);
+      if (container) {
+        m_processorLoader.destroyContainer(container.get());
       }
     }
     m_capProvider.clear();
