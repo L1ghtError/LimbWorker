@@ -485,19 +485,29 @@ function(conan_install)
         endif()
     endif()
 
-    execute_process(COMMAND ${CONAN_COMMAND} install ${CMAKE_SOURCE_DIR} ${conan_args} ${ARGN} --format=json
+    execute_process(COMMAND ${CONAN_COMMAND} install ${CMAKE_SOURCE_DIR} ${conan_args} ${ARGN} --format=json --no-remote -v quiet
                     RESULT_VARIABLE return_code
                     OUTPUT_VARIABLE conan_stdout
                     ERROR_VARIABLE conan_stderr
                     ECHO_ERROR_VARIABLE    # show the text output regardless
                     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
-    if(DEFINED PATH_TO_CMAKE_BIN)
-        set(ENV{PATH} "${old_path}")
+    if(NOT "${return_code}" STREQUAL "0")
+
+        execute_process(COMMAND ${CONAN_COMMAND} install ${CMAKE_SOURCE_DIR} ${conan_args} ${ARGN} --format=json
+                        RESULT_VARIABLE return_code
+                        OUTPUT_VARIABLE conan_stdout
+                        ERROR_VARIABLE conan_stderr
+                        ECHO_ERROR_VARIABLE    # show the text output regardless
+                        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+
+        if(NOT "${return_code}" STREQUAL "0")
+            message(FATAL_ERROR "Conan install failed='${return_code}'")
+        endif()
     endif()
 
-    if(NOT "${return_code}" STREQUAL "0")
-        message(FATAL_ERROR "Conan install failed='${return_code}'")
+    if(DEFINED PATH_TO_CMAKE_BIN)
+        set(ENV{PATH} "${old_path}")
     endif()
 
     # the files are generated in a folder that depends on the layout used, if

@@ -1,7 +1,6 @@
 [requires]
 libjpeg-turbo/3.1.4.1
 [generators]
-CMakeDeps
 CMakeToolchain
 CMakeConfigDeps
 [layout]
